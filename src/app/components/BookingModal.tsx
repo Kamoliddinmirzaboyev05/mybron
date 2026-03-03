@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Calendar, Clock, ChevronDown } from 'lucide-react';
+import { X, Calendar, Clock } from 'lucide-react';
 import { Pitch } from '../lib/supabase';
+import DatePicker from './DatePicker';
+import TimeSlotPicker from './TimeSlotPicker';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -19,58 +21,43 @@ export default function BookingModal({
   bookedSlots,
   onDateChange 
 }: BookingModalProps) {
-  const [selectedDate, setSelectedDate] = useState<string>('today');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [isDateOpen, setIsDateOpen] = useState(false);
-  const [isTimeOpen, setIsTimeOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedDate('today');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      setSelectedDate(today);
       setSelectedTime(null);
-      setIsDateOpen(false);
-      setIsTimeOpen(false);
       onDateChange('today');
     }
   }, [isOpen]);
 
-  const handleDateChange = (date: string) => {
+  const handleDateChange = (date: Date) => {
     setSelectedDate(date);
     setSelectedTime(null);
-    setIsDateOpen(false);
-    onDateChange(date);
+    
+    // Convert date to selection string
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfter = new Date(today);
+    dayAfter.setDate(dayAfter.getDate() + 2);
+    
+    let selection = 'today';
+    if (date.toDateString() === tomorrow.toDateString()) {
+      selection = 'tomorrow';
+    } else if (date.toDateString() === dayAfter.toDateString()) {
+      selection = 'dayAfter';
+    }
+    
+    onDateChange(selection);
   };
 
   if (!isOpen) return null;
-
-  const getDateForSelection = (selection: string): Date => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    if (selection === 'today') return today;
-    if (selection === 'tomorrow') {
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      return tomorrow;
-    }
-    if (selection === 'dayAfter') {
-      const dayAfter = new Date(today);
-      dayAfter.setDate(dayAfter.getDate() + 2);
-      return dayAfter;
-    }
-    return today;
-  };
-
-  const getDateLabel = (selection: string): string => {
-    const date = getDateForSelection(selection);
-    const days = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
-    const months = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
-    
-    if (selection === 'today') return `Bugun, ${date.getDate()} ${months[date.getMonth()]}`;
-    if (selection === 'tomorrow') return `Ertaga, ${date.getDate()} ${months[date.getMonth()]}`;
-    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
-  };
 
   const generateTimeSlots = (): string[] => {
     if (!pitch || !pitch.start_time || !pitch.end_time) return [];
@@ -93,18 +80,32 @@ export default function BookingModal({
     if (selectedTime && !isSubmitting) {
       setIsSubmitting(true);
       try {
-        await onConfirm(selectedDate, selectedTime);
+        // Convert date back to selection string for compatibility
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const dayAfter = new Date(today);
+        dayAfter.setDate(dayAfter.getDate() + 2);
+        
+        let dateSelection = 'today';
+        if (selectedDate.toDateString() === tomorrow.toDateString()) {
+          dateSelection = 'tomorrow';
+        } else if (selectedDate.toDateString() === dayAfter.toDateString()) {
+          dateSelection = 'dayAfter';
+        }
+        
+        await onConfirm(dateSelection, selectedTime);
       } finally {
         setIsSubmitting(false);
       }
     }
   };
 
-  const dateOptions = [
-    { value: 'today', label: 'Bugun' },
-    { value: 'tomorrow', label: 'Ertaga' },
-    { value: 'dayAfter', label: 'Indinga' },
-  ];
+  // Calculate price summary
+  const pricePerHour = pitch.price_per_hour;
+  const hours = 1; // Currently only 1 hour slots
+  const totalPrice = pricePerHour * hours;
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center">
@@ -123,87 +124,33 @@ export default function BookingModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Date Selection */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
-              <Calendar className="w-4 h-4" />
-              Sanani belgilash
-            </label>
-            <button
-              onClick={() => setIsDateOpen(!isDateOpen)}
-              disabled={isSubmitting}
-              className="w-full flex items-center justify-between px-4 py-4 bg-slate-800 border border-slate-700 rounded-xl text-white hover:border-blue-500 transition-colors disabled:opacity-50"
-            >
-              <span className="font-medium">{getDateLabel(selectedDate)}</span>
-              <ChevronDown className={`w-5 h-5 transition-transform ${isDateOpen ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {isDateOpen && (
-              <div className="mt-2 space-y-2">
-                {dateOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => handleDateChange(option.value)}
-                    className={`w-full px-4 py-3 rounded-lg text-left transition-colors ${
-                      selectedDate === option.value
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    {getDateLabel(option.value)}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Date Picker */}
+          <DatePicker selectedDate={selectedDate} onDateChange={handleDateChange} />
 
-          {/* Time Selection */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
-              <Clock className="w-4 h-4" />
-              Vaqtni belgilash
-            </label>
-            <button
-              onClick={() => setIsTimeOpen(!isTimeOpen)}
-              disabled={isSubmitting}
-              className="w-full flex items-center justify-between px-4 py-4 bg-slate-800 border border-slate-700 rounded-xl text-white hover:border-blue-500 transition-colors disabled:opacity-50"
-            >
-              <span className="font-medium">
-                {selectedTime || 'Vaqtni tanlang'}
-              </span>
-              <ChevronDown className={`w-5 h-5 transition-transform ${isTimeOpen ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {isTimeOpen && (
-              <div className="mt-2 grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
-                {timeSlots.map((slot) => {
-                  const isBooked = bookedSlots.has(slot);
-                  
-                  return (
-                    <button
-                      key={slot}
-                      onClick={() => {
-                        if (!isBooked) {
-                          setSelectedTime(slot);
-                          setIsTimeOpen(false);
-                        }
-                      }}
-                      disabled={isBooked}
-                      className={`px-4 py-3 rounded-lg font-medium transition-colors ${
-                        isBooked
-                          ? 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700'
-                          : selectedTime === slot
-                          ? 'bg-blue-600 text-white border-2 border-blue-500'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
-                      }`}
-                    >
-                      {slot}
-                    </button>
-                  );
-                })}
+          {/* Time Slot Picker */}
+          <TimeSlotPicker
+            slots={timeSlots}
+            bookedSlots={bookedSlots}
+            selectedSlot={selectedTime}
+            onSlotSelect={setSelectedTime}
+          />
+
+          {/* Price Summary */}
+          {selectedTime && (
+            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+              <h3 className="text-sm font-semibold text-slate-300 mb-3">Narx hisob-kitobi</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">{hours} soat × {(pricePerHour / 1000).toFixed(0)}k</span>
+                  <span className="text-white font-medium">{(pricePerHour / 1000).toFixed(0)}k so'm</span>
+                </div>
+                <div className="border-t border-slate-700 pt-2 flex justify-between">
+                  <span className="text-white font-semibold">Jami:</span>
+                  <span className="text-blue-500 font-bold text-lg">{totalPrice.toLocaleString()} so'm</span>
+                </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

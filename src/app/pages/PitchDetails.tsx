@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { supabase, Pitch, Booking } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
-import { ArrowLeft, MapPin, Droplets, Car, Wifi, Coffee, Moon, Users, Shield, Zap, Clock, Calendar as CalendarIcon } from 'lucide-react';
+import { ArrowLeft, MapPin, Droplets, Car, Wifi, Coffee, Moon, Users, Shield, Zap, Clock, Calendar as CalendarIcon, Share2 } from 'lucide-react';
 import PitchImageSlider from '../components/PitchImageSlider';
 import BookingModal from '../components/BookingModal';
+import ReviewsSection from '../components/ReviewsSection';
 
 // Amenity icon mapping
 const getAmenityIcon = (amenity: string) => {
@@ -130,12 +131,31 @@ export default function PitchDetails() {
 
   const handleBookingClick = () => {
     if (!user) {
-      // Save current pitch ID to return after login
       sessionStorage.setItem('returnToPitch', id || '');
       navigate('/login');
       return;
     }
     setShowBookingModal(true);
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      title: pitch?.name || 'Maydon',
+      text: `${pitch?.name} - ${pitch?.location}`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Havola nusxalandi!');
+      }
+    } catch (err) {
+      console.error('Error sharing:', err);
+    }
   };
 
   const handleDateChange = (date: string) => {
@@ -231,6 +251,13 @@ export default function PitchDetails() {
             <ArrowLeft className="w-6 h-6" />
           </button>
           
+          <button
+            onClick={handleShare}
+            className="absolute top-4 right-4 z-20 bg-black/50 backdrop-blur-sm text-white p-2 rounded-full hover:bg-black/70 transition-colors"
+          >
+            <Share2 className="w-6 h-6" />
+          </button>
+          
           {pitch.images && pitch.images.length > 0 ? (
             <PitchImageSlider images={pitch.images} alt={pitch.name} />
           ) : (
@@ -306,6 +333,9 @@ export default function PitchDetails() {
               </div>
             </div>
           )}
+
+          {/* Reviews Section */}
+          <ReviewsSection pitchId={id || ''} />
         </div>
 
         {/* Sticky Bottom Bar */}

@@ -59,3 +59,20 @@ export interface Profile {
   role: 'user' | 'admin';
   created_at?: string;
 }
+
+export interface Favorite {
+  id: string;
+  user_id: string;
+  pitch_id: string;
+  created_at?: string;
+}
+
+export interface Review {
+  id: string;
+  pitch_id: string;
+  user_id: string;
+  rating: number;
+  comment?: string;
+  created_at?: string;
+  profiles?: Profile;
+}
