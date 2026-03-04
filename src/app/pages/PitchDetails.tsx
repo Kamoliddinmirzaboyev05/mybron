@@ -300,19 +300,6 @@ export default function PitchDetails() {
               </div>
             </div>
           </div>
-          
-          {/* Google Maps Link */}
-          {pitch.latitude && pitch.longitude && (
-            <a
-              href={`https://www.google.com/maps?q=${pitch.latitude},${pitch.longitude}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-blue-500 hover:text-blue-400 transition-colors mb-6"
-            >
-              <MapPin className="w-4 h-4" />
-              Google Maps'da ko'rish
-            </a>
-          )}
 
           {/* Facilities/Amenities */}
           {pitch.amenities && pitch.amenities.length > 0 && (

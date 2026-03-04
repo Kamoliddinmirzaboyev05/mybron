@@ -4,21 +4,27 @@ import BottomNav from '../components/BottomNav';
 import { useAuth } from '../lib/AuthContext';
 import { supabase, Profile as ProfileType } from '../lib/supabase';
 import { User, Phone, Mail, Moon, Sun, LogOut, ChevronRight } from 'lucide-react';
+import { formatPhoneNumber } from '../lib/phoneFormatter';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading: authLoading } = useAuth();
   const [darkMode, setDarkMode] = useState(true);
   const [profile, setProfile] = useState<ProfileType | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Auth loading tugaguncha kutish
+    if (authLoading) {
+      return;
+    }
+
     if (user) {
       fetchProfile();
     } else {
       navigate('/login');
     }
-  }, [user, navigate]);
+  }, [user, navigate, authLoading]);
 
   const fetchProfile = async () => {
     if (!user) return;
@@ -49,17 +55,19 @@ export default function Profile() {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-slate-400">Loading...</div>
+        <div className="text-slate-400">Yuklanmoqda...</div>
       </div>
     );
   }
 
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
   const displayEmail = profile?.email || user?.email || '';
-  const displayPhone = profile?.phone || 'Not provided';
+  const displayPhone = profile?.phone 
+    ? (profile.phone.startsWith('+998') ? formatPhoneNumber(profile.phone) : profile.phone)
+    : 'Kiritilmagan';
   const memberSince = profile?.created_at 
     ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : 'Recently';
@@ -102,7 +110,7 @@ export default function Profile() {
               <div className="px-4 py-4 flex items-center">
                 <Phone className="w-5 h-5 text-slate-400 mr-3" />
                 <div className="flex-1">
-                  <div className="text-xs text-slate-500 mb-1">Phone</div>
+                  <div className="text-xs text-slate-500 mb-1">Telefon</div>
                   <div className="text-white">{displayPhone}</div>
                 </div>
               </div>

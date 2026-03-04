@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../lib/AuthContext';
 import { Mail, Lock, User, Phone, AlertCircle, CheckCircle } from 'lucide-react';
+import { formatPhoneNumber, cleanPhoneNumber, isValidUzbekPhone } from '../lib/phoneFormatter';
 
 export default function Register() {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { signUp, user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -13,6 +14,13 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  // Agar user allaqachon login qilgan bo'lsa, bosh sahifaga yo'naltirish
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/');
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +33,14 @@ export default function Register() {
       return;
     }
 
-    const { error } = await signUp(email, password, fullName, phone);
+    if (!isValidUzbekPhone(phone)) {
+      setError('Iltimos, to\'g\'ri telefon raqam kiriting (+998 XX XXX XX XX)');
+      setLoading(false);
+      return;
+    }
+
+    const cleanedPhone = cleanPhoneNumber(phone);
+    const { error } = await signUp(email, password, fullName, cleanedPhone);
 
     if (error) {
       setError(error.message);
@@ -71,7 +86,10 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4 py-8">
-      <div className="max-w-md w-full">
+      {authLoading ? (
+        <div className="text-slate-400">Yuklanmoqda...</div>
+      ) : (
+        <div className="max-w-md w-full">
         {/* Logo/Header */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden bg-white/5 p-2">
@@ -127,19 +145,20 @@ export default function Register() {
 
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Phone Number
+              Telefon raqam
             </label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
               <input
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1 234 567 8900"
+                onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
+                placeholder="+998 90 123 45 67"
                 required
                 className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
               />
             </div>
+            <p className="text-xs text-slate-500 mt-1">Format: +998 XX XXX XX XX</p>
           </div>
 
           <div>
@@ -183,6 +202,7 @@ export default function Register() {
           </p>
         </div>
       </div>
+      )}
     </div>
   );
 }

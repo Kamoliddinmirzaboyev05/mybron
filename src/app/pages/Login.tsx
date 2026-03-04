@@ -1,15 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../lib/AuthContext';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Agar user allaqachon login qilgan bo'lsa, bosh sahifaga yo'naltirish
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/');
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +42,10 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
+      {authLoading ? (
+        <div className="text-slate-400">Yuklanmoqda...</div>
+      ) : (
+        <div className="max-w-md w-full">
         {/* Logo/Header */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden bg-white/5 p-2">
@@ -111,6 +121,7 @@ export default function Login() {
           </p>
         </div>
       </div>
+      )}
     </div>
   );
 }

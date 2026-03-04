@@ -4,15 +4,21 @@ import { supabase, Booking } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import BottomNav from '../components/BottomNav';
 import { Calendar, Clock, X } from 'lucide-react';
+import { formatPhoneNumber } from '../lib/phoneFormatter';
 
 export default function Bookings() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pending' | 'confirmed' | 'history'>('pending');
 
   useEffect(() => {
+    // Auth loading tugaguncha kutish
+    if (authLoading) {
+      return;
+    }
+
     if (!user) {
       navigate('/login');
       return;
@@ -20,18 +26,19 @@ export default function Bookings() {
 
     fetchBookings();
 
-    // Real-time subscription
+    // Real-time subscription - faqat shu foydalanuvchining bronlari uchun
     const channel = supabase
-      .channel('bookings_changes')
+      .channel('user_bookings_changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'bookings',
+          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Booking change detected:', payload);
+          console.log('Booking change detected for user:', payload);
           fetchBookings();
         }
       )
@@ -40,10 +47,12 @@ export default function Bookings() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, navigate]);
+  }, [user, navigate, authLoading]);
 
   const fetchBookings = async () => {
     if (!user) return;
+
+    console.log('Fetching bookings for user:', user.id);
 
     try {
       const { data, error } = await supabase
@@ -63,6 +72,8 @@ export default function Bookings() {
       if (error) {
         console.error('Error fetching bookings:', error);
       } else {
+        console.log('Fetched bookings:', data);
+        console.log('Total bookings count:', data?.length || 0);
         setBookings(data || []);
       }
     } catch (err) {
@@ -78,16 +89,19 @@ export default function Bookings() {
     }
 
     try {
+      // O'chirish o'rniga statusni "cancelled" ga o'zgartirish
       const { error } = await supabase
         .from('bookings')
-        .delete()
-        .eq('id', bookingId);
+        .update({ status: 'cancelled' })
+        .eq('id', bookingId)
+        .eq('user_id', user?.id); // Faqat o'z bronini bekor qilishi mumkin
 
       if (error) {
         console.error('Error canceling booking:', error);
         alert('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
       } else {
-        fetchBookings();
+        // Real-time subscription avtomatik yangilaydi
+        console.log('Booking cancelled successfully');
       }
     } catch (err) {
       console.error('Exception while canceling booking:', err);
@@ -96,10 +110,25 @@ export default function Bookings() {
   };
 
   const filterBookings = (status: string) => {
+    console.log('Filtering bookings by status:', status);
+    console.log('All bookings:', bookings);
+    
     if (status === 'history') {
-      return bookings.filter(b => b.status === 'rejected');
+      // Tarix: rad etilgan va bekor qilingan bronlar
+      const filtered = bookings.filter(b => b.status === 'rejected' || b.status === 'cancelled');
+      console.log('History bookings:', filtered);
+      return filtered;
     }
-    return bookings.filter(b => b.status === status);
+    if (status === 'confirmed') {
+      // Tasdiqlangan: confirmed va manual statusdagi bronlar
+      const filtered = bookings.filter(b => b.status === 'confirmed' || b.status === 'manual');
+      console.log('Confirmed bookings:', filtered);
+      return filtered;
+    }
+    // Pending: kutilayotgan bronlar
+    const filtered = bookings.filter(b => b.status === status);
+    console.log('Pending bookings:', filtered);
+    return filtered;
   };
 
   const formatDate = (booking: Booking) => {
@@ -137,6 +166,7 @@ export default function Bookings() {
       'pending': 'Kutilmoqda',
       'confirmed': 'Tasdiqlangan',
       'rejected': 'Rad etilgan',
+      'cancelled': 'Bekor qilingan',
       'manual': 'Tasdiqlangan'
     };
     return labels[status] || status;
@@ -146,7 +176,13 @@ export default function Bookings() {
 
   return (
     <div className="min-h-screen bg-slate-950 pb-20">
-      <div className="max-w-md mx-auto">
+      {/* Auth loading holatini ko'rsatish */}
+      {authLoading ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-slate-400">Yuklanmoqda...</div>
+        </div>
+      ) : (
+        <div className="max-w-md mx-auto">
         {/* Header */}
         <div className="sticky top-0 bg-slate-950 z-10 px-4 py-6 border-b border-slate-800">
           <h1 className="text-2xl font-bold text-white">Mening bronlarim</h1>
@@ -186,8 +222,22 @@ export default function Bookings() {
             <div className="flex flex-col items-center justify-center py-20">
               <Calendar className="w-16 h-16 text-slate-700 mb-4" />
               <div className="text-slate-400 text-center">
-                <p className="font-medium mb-1">{activeTab === 'pending' ? 'Kutilayotgan' : activeTab === 'confirmed' ? 'Tasdiqlangan' : 'Tarixiy'} bronlar yo'q</p>
-                <p className="text-sm">Sizning bronlaringiz bu yerda ko'rinadi</p>
+                <p className="font-medium mb-1">
+                  {activeTab === 'pending' ? 'Kutilayotgan' : activeTab === 'confirmed' ? 'Tasdiqlangan' : 'Tarixiy'} bronlar yo'q
+                </p>
+                <p className="text-sm mb-4">
+                  {bookings.length === 0 
+                    ? 'Hali hech qanday bron qilmagansiz' 
+                    : 'Sizning bronlaringiz bu yerda ko\'rinadi'}
+                </p>
+                {bookings.length === 0 && (
+                  <button
+                    onClick={() => navigate('/')}
+                    className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Maydonlarni ko'rish
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -224,7 +274,11 @@ export default function Bookings() {
                     <div className="text-xs text-slate-500 mb-1">Bron ma'lumotlari</div>
                     <div className="text-sm text-slate-300">
                       <div><span className="text-slate-500">Ism:</span> {booking.full_name || booking.customer_name || 'N/A'}</div>
-                      <div><span className="text-slate-500">Telefon:</span> {booking.phone || booking.customer_phone || 'N/A'}</div>
+                      <div><span className="text-slate-500">Telefon:</span> {
+                        booking.phone || booking.customer_phone 
+                          ? formatPhoneNumber(booking.phone || booking.customer_phone || '')
+                          : 'N/A'
+                      }</div>
                       {booking.total_price && (
                         <div><span className="text-slate-500">Narx:</span> {booking.total_price.toLocaleString()} so'm</div>
                       )}
@@ -247,6 +301,7 @@ export default function Bookings() {
           )}
         </div>
       </div>
+      )}
 
       <BottomNav />
     </div>

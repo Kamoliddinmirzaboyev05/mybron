@@ -8,7 +8,6 @@ import PitchCardSkeleton from '../components/PitchCardSkeleton';
 import SearchBar from '../components/SearchBar';
 import QuickFilters from '../components/QuickFilters';
 import { useNavigate } from 'react-router';
-import { Map } from 'lucide-react';
 
 export default function Home() {
   const { user } = useAuth();
@@ -18,7 +17,6 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [showMapView, setShowMapView] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -160,18 +158,6 @@ export default function Home() {
                   <p className="text-slate-400 text-sm">Bugun qayerda o'ynaymiz?</p>
                 </div>
               </div>
-              
-              {/* Map Toggle Button */}
-              <button
-                onClick={() => setShowMapView(!showMapView)}
-                className={`p-2 rounded-lg transition-colors ${
-                  showMapView 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-slate-800 text-slate-400 hover:text-white'
-                }`}
-              >
-                <Map className="w-5 h-5" />
-              </button>
             </div>
           </div>
 
@@ -185,20 +171,8 @@ export default function Home() {
         {/* Setup Banner */}
         {!isSupabaseConfigured && <SetupBanner />}
 
-        {/* Map View Placeholder */}
-        {showMapView && (
-          <div className="px-4 py-8">
-            <div className="bg-slate-900 rounded-xl p-8 text-center border border-slate-800">
-              <Map className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <p className="text-slate-400 mb-2">Xarita ko'rinishi</p>
-              <p className="text-slate-500 text-sm">Google Maps integratsiyasi tez orada qo'shiladi</p>
-            </div>
-          </div>
-        )}
-
         {/* Pitches List */}
-        {!showMapView && (
-          <div className="px-4 py-4">
+        <div className="px-4 py-4">
             {loading ? (
               <div className="grid grid-cols-2 gap-3">
                 {[...Array(6)].map((_, i) => (
@@ -235,8 +209,7 @@ export default function Home() {
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
 
       <BottomNav />
     </div>
