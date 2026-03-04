@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { supabase, Booking } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
+import { calculateHours } from '../lib/dateUtils';
+import { toast } from 'sonner';
 import BottomNav from '../components/BottomNav';
 import BookingCardSkeleton from '../components/BookingCardSkeleton';
 import { Calendar, Clock, X } from 'lucide-react';
@@ -89,24 +91,36 @@ export default function Bookings() {
       return;
     }
 
+    const loadingToast = toast.loading('Bekor qilinmoqda...');
+
     try {
-      // O'chirish o'rniga statusni "cancelled" ga o'zgartirish
+      // Update status to 'cancelled'
       const { error } = await supabase
         .from('bookings')
         .update({ status: 'cancelled' })
         .eq('id', bookingId)
-        .eq('user_id', user?.id); // Faqat o'z bronini bekor qilishi mumkin
+        .eq('user_id', user?.id); // Only cancel own bookings
 
       if (error) {
         console.error('Error canceling booking:', error);
-        alert('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+        toast.error('Xatolik yuz berdi', { 
+          id: loadingToast,
+          description: 'Qaytadan urinib ko\'ring.'
+        });
       } else {
-        // Real-time subscription avtomatik yangilaydi
+        toast.success('Bron bekor qilindi!', { 
+          id: loadingToast,
+          description: 'Vaqt endi boshqalar uchun ochiq.'
+        });
+        // Real-time subscription will auto-update
         console.log('Booking cancelled successfully');
       }
     } catch (err) {
       console.error('Exception while canceling booking:', err);
-      alert('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+      toast.error('Xatolik yuz berdi', { 
+        id: loadingToast,
+        description: 'Qaytadan urinib ko\'ring.'
+      });
     }
   };
 
@@ -145,7 +159,8 @@ export default function Bookings() {
     if (!startTime || !endTime) return 'N/A';
     const start = startTime.slice(0, 5); // HH:MM
     const end = endTime.slice(0, 5); // HH:MM
-    return `${start} - ${end}`;
+    const hours = calculateHours(startTime, endTime);
+    return `${start} - ${end} (${hours} soat)`;
   };
 
   const getStatusColor = (status: string) => {
@@ -156,6 +171,7 @@ export default function Bookings() {
       case 'manual':
         return 'bg-green-500/20 text-green-500 border-green-500/30';
       case 'rejected':
+      case 'cancelled':
         return 'bg-red-500/20 text-red-500 border-red-500/30';
       default:
         return 'bg-slate-500/20 text-slate-500 border-slate-500/30';

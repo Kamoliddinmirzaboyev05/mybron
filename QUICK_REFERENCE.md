@@ -3,17 +3,14 @@
 ## 🚀 Quick Start (3 Steps)
 
 1. **Run Database Migration**
-   ```bash
-   # Open Supabase SQL Editor
-   # Copy & paste DATABASE_MIGRATION.sql
-   # Execute
-   ```
-
+  bash
+    Open Supabase SQL Editor
+    Copy & paste DATABASE_MIGRATION.sql
+    Execute
 2. **Start Development**
-   ```bash
+   bash
    npm install
    npm run dev
-   ```
 
 3. **Test Features**
    - Search for pitches
@@ -23,7 +20,6 @@
 
 ## 📋 Feature Checklist
 
-### Home Page
 - [x] Dynamic greeting with user name
 - [x] Search bar (real-time filtering)
 - [x] Quick filters (4 categories)

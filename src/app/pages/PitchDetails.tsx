@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { supabase, Pitch, Booking } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
+import { toDateString, filterPastSlots } from '../lib/dateUtils';
+import { toast } from 'sonner';
 import { ArrowLeft, MapPin, Droplets, Car, Wifi, Coffee, Moon, Users, Shield, Zap, Clock, Calendar as CalendarIcon, Share2 } from 'lucide-react';
 import PitchImageSlider from '../components/PitchImageSlider';
 import BookingModal from '../components/BookingModal';
@@ -46,7 +48,7 @@ export default function PitchDetails() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedDateForBooking, setSelectedDateForBooking] = useState<string>('today');
+  const [selectedDateForBooking, setSelectedDateForBooking] = useState<string>('');
 
   useEffect(() => {
     if (id) {
@@ -55,7 +57,7 @@ export default function PitchDetails() {
   }, [id]);
 
   useEffect(() => {
-    if (id && showBookingModal) {
+    if (id && showBookingModal && selectedDateForBooking) {
       fetchBookedSlots();
     }
   }, [id, showBookingModal, selectedDateForBooking]);
@@ -80,36 +82,16 @@ export default function PitchDetails() {
     }
   };
 
-  const getDateForSelection = (selection: string): Date => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    if (selection === 'today') return today;
-    if (selection === 'tomorrow') {
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      return tomorrow;
-    }
-    if (selection === 'dayAfter') {
-      const dayAfter = new Date(today);
-      dayAfter.setDate(dayAfter.getDate() + 2);
-      return dayAfter;
-    }
-    return today;
-  };
-
   const fetchBookedSlots = async () => {
-    if (!id) return;
+    if (!id || !selectedDateForBooking) return;
 
     try {
-      const targetDate = getDateForSelection(selectedDateForBooking);
-      const dateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-
+      // Only fetch confirmed and pending bookings - cancelled/rejected are available
       const { data, error } = await supabase
         .from('bookings')
         .select('start_time, end_time')
         .eq('pitch_id', id)
-        .eq('booking_date', dateStr)
+        .eq('booking_date', selectedDateForBooking)
         .in('status', ['pending', 'confirmed', 'manual']);
 
       if (error) {
@@ -117,11 +99,14 @@ export default function PitchDetails() {
       } else {
         const slots = new Set<string>();
         data?.forEach((item: any) => {
-          // start_time and end_time are time format (HH:MM:SS)
+          // Mark all hours in the booking range as booked
           const startHour = parseInt(item.start_time.split(':')[0]);
           const endHour = parseInt(item.end_time.split(':')[0]);
-          const timeSlot = `${startHour.toString().padStart(2, '0')}:00 - ${endHour.toString().padStart(2, '0')}:00`;
-          slots.add(timeSlot);
+          
+          for (let hour = startHour; hour < endHour; hour++) {
+            const timeSlot = `${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00`;
+            slots.add(timeSlot);
+          }
         });
         setBookedSlots(slots);
       }
@@ -159,37 +144,80 @@ export default function PitchDetails() {
     }
   };
 
-  const handleDateChange = (date: string) => {
-    setSelectedDateForBooking(date);
-    fetchBookedSlots();
+  const handleDateChange = (dateStr: string) => {
+    setSelectedDateForBooking(dateStr);
   };
 
-  const handleBookingConfirm = async (date: string, timeSlot: string) => {
+  const handleBookingConfirm = async (
+    dateStr: string, 
+    slots: string[], 
+    totalHours: number, 
+    totalPrice: number
+  ) => {
     if (!user || !pitch) return;
 
+    const loadingToast = toast.loading('Bron qilinmoqda...');
+
     try {
-      // Fetch user profile for full_name and phone (optional, may not exist)
+      // Fetch user profile for full_name and phone
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('full_name, phone')
         .eq('id', user.id)
-        .maybeSingle(); // Use maybeSingle instead of single to avoid error if not found
+        .maybeSingle();
 
       if (profileError && profileError.code !== 'PGRST116') {
         console.error('Error fetching profile:', profileError);
       }
 
-      const targetDate = getDateForSelection(date);
-      const dateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
-      const [startTimeStr] = timeSlot.split(' - ');
-      const [hour] = startTimeStr.split(':').map(Number);
-      
-      // Format time as HH:MM:SS for time type
-      const startTimeFormatted = `${hour.toString().padStart(2, '0')}:00:00`;
-      const endTimeFormatted = `${(hour + 1).toString().padStart(2, '0')}:00:00`;
+      // Get start and end times from selected slots
+      const slotHours = slots.map(slot => {
+        const [startStr] = slot.split(' - ');
+        return parseInt(startStr.split(':')[0]);
+      }).sort((a, b) => a - b);
 
-      // Calculate total price (1 hour)
-      const totalPrice = pitch.price_per_hour;
+      const startHour = Math.min(...slotHours);
+      const endHour = Math.max(...slotHours) + 1;
+
+      // Double-check availability for each hour in the range
+      const { data: existingBookings, error: checkError } = await supabase
+        .from('bookings')
+        .select('start_time, end_time')
+        .eq('pitch_id', id)
+        .eq('booking_date', dateStr)
+        .in('status', ['pending', 'confirmed', 'manual']);
+
+      if (checkError) {
+        console.error('Error checking availability:', checkError);
+        toast.error('Xatolik yuz berdi', { id: loadingToast });
+        return;
+      }
+
+      // Check if any hour in our range is already booked
+      let hasConflict = false;
+      existingBookings?.forEach((booking: any) => {
+        const bookedStart = parseInt(booking.start_time.split(':')[0]);
+        const bookedEnd = parseInt(booking.end_time.split(':')[0]);
+        
+        for (let hour = startHour; hour < endHour; hour++) {
+          if (hour >= bookedStart && hour < bookedEnd) {
+            hasConflict = true;
+            break;
+          }
+        }
+      });
+
+      if (hasConflict) {
+        toast.error('Bu vaqt band!', { 
+          id: loadingToast,
+          description: 'Tanlangan vaqtda boshqa bron mavjud. Iltimos, boshqa vaqt tanlang.'
+        });
+        return;
+      }
+
+      // Format times as HH:MM:SS for time type
+      const startTimeFormatted = `${startHour.toString().padStart(2, '0')}:00:00`;
+      const endTimeFormatted = `${endHour.toString().padStart(2, '0')}:00:00`;
 
       const { error } = await supabase.from('bookings').insert({
         pitch_id: id,
@@ -208,12 +236,22 @@ export default function PitchDetails() {
         
         // Check for overlap error from trigger
         if (error.message && (error.message.includes('overlap') || error.message.includes('bron'))) {
-          alert('Bu vaqtda boshqa mijoz bron qilgan. Iltimos, boshqa vaqt tanlang.');
+          toast.error('Bu vaqt band!', { 
+            id: loadingToast,
+            description: 'Tanlangan vaqtda boshqa bron mavjud.'
+          });
         } else {
-          alert('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+          toast.error('Xatolik yuz berdi', { 
+            id: loadingToast,
+            description: 'Qaytadan urinib ko\'ring.'
+          });
         }
         throw error;
       } else {
+        toast.success('Muvaffaqiyatli band qilindi!', { 
+          id: loadingToast,
+          description: 'Admin tasdiqlashini kuting.'
+        });
         setShowBookingModal(false);
         setShowSuccess(true);
         fetchBookedSlots();

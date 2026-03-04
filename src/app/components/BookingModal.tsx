@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Calendar, Clock } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Pitch } from '../lib/supabase';
+import { toDateString, filterPastSlots } from '../lib/dateUtils';
 import DatePicker from './DatePicker';
 import TimeSlotPicker from './TimeSlotPicker';
 
@@ -8,9 +9,9 @@ interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   pitch: Pitch;
-  onConfirm: (date: string, timeSlot: string) => Promise<void>;
+  onConfirm: (dateStr: string, slots: string[], totalHours: number, totalPrice: number) => Promise<void>;
   bookedSlots: Set<string>;
-  onDateChange: (date: string) => void;
+  onDateChange: (dateStr: string) => void;
 }
 
 export default function BookingModal({ 
@@ -22,7 +23,7 @@ export default function BookingModal({
   onDateChange 
 }: BookingModalProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -30,31 +31,19 @@ export default function BookingModal({
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       setSelectedDate(today);
-      setSelectedTime(null);
-      onDateChange('today');
+      setSelectedSlots([]);
+      onDateChange(toDateString(today));
     }
   }, [isOpen]);
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
-    setSelectedTime(null);
-    
-    // Convert date to selection string
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dayAfter = new Date(today);
-    dayAfter.setDate(dayAfter.getDate() + 2);
-    
-    let selection = 'today';
-    if (date.toDateString() === tomorrow.toDateString()) {
-      selection = 'tomorrow';
-    } else if (date.toDateString() === dayAfter.toDateString()) {
-      selection = 'dayAfter';
-    }
-    
-    onDateChange(selection);
+    setSelectedSlots([]);
+    onDateChange(toDateString(date));
+  };
+
+  const handleSlotsChange = (slots: string[]) => {
+    setSelectedSlots(slots);
   };
 
   if (!isOpen) return null;
@@ -71,48 +60,38 @@ export default function BookingModal({
       slots.push(`${hour.toString().padStart(2, '0')}:00 - ${nextHour.toString().padStart(2, '0')}:00`);
     }
     
-    return slots;
+    // Filter out past slots if today
+    return filterPastSlots(slots, selectedDate);
   };
 
   const timeSlots = generateTimeSlots();
 
   const handleConfirm = async () => {
-    if (selectedTime && !isSubmitting) {
+    if (selectedSlots.length > 0 && !isSubmitting) {
       setIsSubmitting(true);
       try {
-        // Convert date back to selection string for compatibility
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const dayAfter = new Date(today);
-        dayAfter.setDate(dayAfter.getDate() + 2);
+        const dateStr = toDateString(selectedDate);
+        const totalHours = selectedSlots.length;
+        const totalPrice = pitch.price_per_hour * totalHours;
         
-        let dateSelection = 'today';
-        if (selectedDate.toDateString() === tomorrow.toDateString()) {
-          dateSelection = 'tomorrow';
-        } else if (selectedDate.toDateString() === dayAfter.toDateString()) {
-          dateSelection = 'dayAfter';
-        }
-        
-        await onConfirm(dateSelection, selectedTime);
+        await onConfirm(dateStr, selectedSlots, totalHours, totalPrice);
       } finally {
         setIsSubmitting(false);
       }
     }
   };
 
-  // Calculate price summary
-  const pricePerHour = pitch.price_per_hour;
-  const hours = 1; // Currently only 1 hour slots
-  const totalPrice = pricePerHour * hours;
+  const hasValidSelection = selectedSlots.length > 0;
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center">
       <div className="bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-800">
-          <h2 className="text-xl font-bold text-white">Vaqtni tanlang</h2>
+          <div>
+            <h2 className="text-xl font-bold text-white">Band qilish</h2>
+            <p className="text-sm text-slate-400 mt-1">{pitch.name}</p>
+          </div>
           <button
             onClick={onClose}
             disabled={isSubmitting}
@@ -131,40 +110,24 @@ export default function BookingModal({
           <TimeSlotPicker
             slots={timeSlots}
             bookedSlots={bookedSlots}
-            selectedSlot={selectedTime}
-            onSlotSelect={setSelectedTime}
+            selectedSlots={selectedSlots}
+            onSlotsChange={handleSlotsChange}
+            pricePerHour={pitch.price_per_hour}
           />
-
-          {/* Price Summary */}
-          {selectedTime && (
-            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-              <h3 className="text-sm font-semibold text-slate-300 mb-3">Narx hisob-kitobi</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">{hours} soat × {(pricePerHour / 1000).toFixed(0)}k</span>
-                  <span className="text-white font-medium">{(pricePerHour / 1000).toFixed(0)}k so'm</span>
-                </div>
-                <div className="border-t border-slate-700 pt-2 flex justify-between">
-                  <span className="text-white font-semibold">Jami:</span>
-                  <span className="text-blue-500 font-bold text-lg">{totalPrice.toLocaleString()} so'm</span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer */}
         <div className="p-6 border-t border-slate-800 bg-slate-900">
           <button
             onClick={handleConfirm}
-            disabled={!selectedTime || isSubmitting}
+            disabled={!hasValidSelection || isSubmitting}
             className={`w-full py-4 rounded-xl font-semibold transition-colors ${
-              selectedTime && !isSubmitting
+              hasValidSelection && !isSubmitting
                 ? 'bg-blue-600 hover:bg-blue-700 text-white'
                 : 'bg-slate-800 text-slate-500 cursor-not-allowed'
             }`}
           >
-            {isSubmitting ? 'Yuklanmoqda...' : 'Band qilish'}
+            {isSubmitting ? 'Yuklanmoqda...' : hasValidSelection ? `${selectedSlots.length} soat band qilish` : 'Vaqt tanlang'}
           </button>
         </div>
       </div>
