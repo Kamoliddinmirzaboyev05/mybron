@@ -6,6 +6,7 @@ import { ArrowLeft, MapPin, Droplets, Car, Wifi, Coffee, Moon, Users, Shield, Za
 import PitchImageSlider from '../components/PitchImageSlider';
 import BookingModal from '../components/BookingModal';
 import ReviewsSection from '../components/ReviewsSection';
+import PitchDetailsSkeleton from '../components/PitchDetailsSkeleton';
 
 // Amenity icon mapping
 const getAmenityIcon = (amenity: string) => {
@@ -224,11 +225,7 @@ export default function PitchDetails() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-slate-400">Yuklanmoqda...</div>
-      </div>
-    );
+    return <PitchDetailsSkeleton />;
   }
 
   if (!pitch) {

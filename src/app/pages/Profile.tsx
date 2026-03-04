@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import BottomNav from '../components/BottomNav';
+import ProfileSkeleton from '../components/ProfileSkeleton';
 import { useAuth } from '../lib/AuthContext';
 import { supabase, Profile as ProfileType } from '../lib/supabase';
 import { User, Phone, Mail, Moon, Sun, LogOut, ChevronRight } from 'lucide-react';
@@ -56,15 +57,11 @@ export default function Profile() {
   };
 
   if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-slate-400">Yuklanmoqda...</div>
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
 
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
-  const displayEmail = profile?.email || user?.email || '';
+  const displayEmail = user?.email || '';
   const displayPhone = profile?.phone 
     ? (profile.phone.startsWith('+998') ? formatPhoneNumber(profile.phone) : profile.phone)
     : 'Kiritilmagan';
@@ -73,7 +70,7 @@ export default function Profile() {
     : 'Recently';
 
   return (
-    <div className="min-h-screen bg-slate-950 pb-20">
+    <div className="min-h-screen bg-slate-950 pb-20 opacity-0 animate-fadeIn">
       <div className="max-w-md mx-auto">
         {/* Header */}
         <div className="sticky top-0 bg-slate-950 z-10 px-4 py-6 border-b border-slate-800">

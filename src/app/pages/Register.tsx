@@ -10,7 +10,7 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState('+998 ');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -152,7 +152,32 @@ export default function Register() {
               <input
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
+                onChange={(e) => {
+                  const formatted = formatPhoneNumber(e.target.value);
+                  // +998 ni o'chirishga ruxsat bermaslik
+                  if (formatted.startsWith('+998')) {
+                    setPhone(formatted);
+                  } else {
+                    setPhone('+998 ');
+                  }
+                }}
+                onFocus={(e) => {
+                  // Agar bo'sh bo'lsa, +998 qo'shish
+                  if (!phone || phone.trim() === '') {
+                    setPhone('+998 ');
+                  }
+                  // Kursorni oxiriga o'tkazish
+                  setTimeout(() => {
+                    e.target.setSelectionRange(e.target.value.length, e.target.value.length);
+                  }, 0);
+                }}
+                onKeyDown={(e) => {
+                  // Backspace bilan +998 ni o'chirishga ruxsat bermaslik
+                  if (e.key === 'Backspace' && phone.length <= 5) {
+                    e.preventDefault();
+                    setPhone('+998 ');
+                  }
+                }}
                 placeholder="+998 90 123 45 67"
                 required
                 className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"

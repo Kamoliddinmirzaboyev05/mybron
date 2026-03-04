@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { supabase, Booking } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import BottomNav from '../components/BottomNav';
+import BookingCardSkeleton from '../components/BookingCardSkeleton';
 import { Calendar, Clock, X } from 'lucide-react';
 import { formatPhoneNumber } from '../lib/phoneFormatter';
 
@@ -184,13 +185,13 @@ export default function Bookings() {
       ) : (
         <div className="max-w-md mx-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-slate-950 z-10 px-4 py-6 border-b border-slate-800">
+        <div className="sticky top-0 bg-slate-950 z-10 px-4 py-6 border-b border-slate-800 animate-fadeInUp">
           <h1 className="text-2xl font-bold text-white">Mening bronlarim</h1>
           <p className="text-slate-400 text-sm mt-1">Maydon bandlovlaringizni kuzating</p>
         </div>
 
         {/* Tabs */}
-        <div className="sticky top-[88px] bg-slate-950 z-10 px-4 py-4 border-b border-slate-800">
+        <div className="sticky top-[88px] bg-slate-950 z-10 px-4 py-4 border-b border-slate-800 animate-fadeInUp" style={{ animationDelay: '0.1s' }}>
           <div className="flex gap-2">
             {[
               { value: 'pending', label: 'Kutilmoqda' },
@@ -213,11 +214,13 @@ export default function Bookings() {
         </div>
 
         {/* Bookings List */}
-        <div className="px-4 py-4 space-y-4">
+        <div className="px-4 py-4 space-y-4 animate-fadeInUp" style={{ animationDelay: '0.2s' }}>
           {loading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="text-slate-400">Yuklanmoqda...</div>
-            </div>
+            <>
+              {[...Array(3)].map((_, i) => (
+                <BookingCardSkeleton key={i} />
+              ))}
+            </>
           ) : filteredBookings.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20">
               <Calendar className="w-16 h-16 text-slate-700 mb-4" />

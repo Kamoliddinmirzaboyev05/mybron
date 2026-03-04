@@ -1,7 +1,6 @@
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Navigation, Pagination, Autoplay, EffectFade } from 'swiper/modules';
+import { Pagination, Autoplay, EffectFade } from 'swiper/modules';
 import 'swiper/css';
-import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import 'swiper/css/effect-fade';
 
@@ -22,8 +21,7 @@ export default function PitchImageSlider({ images, alt }: PitchImageSliderProps)
   return (
     <div className="pitch-slider aspect-video bg-slate-800">
       <Swiper
-        modules={[Navigation, Pagination, Autoplay, EffectFade]}
-        navigation
+        modules={[Pagination, Autoplay, EffectFade]}
         pagination={{ 
           clickable: true,
           dynamicBullets: true 

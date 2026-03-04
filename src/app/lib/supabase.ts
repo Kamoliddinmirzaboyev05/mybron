@@ -53,10 +53,12 @@ export interface Booking {
 
 export interface Profile {
   id: string;
-  email: string;
   full_name?: string;
   phone?: string;
   role: 'user' | 'admin';
+  total_revenue?: number;
+  balance?: number;
+  updated_at?: string;
   created_at?: string;
 }
 

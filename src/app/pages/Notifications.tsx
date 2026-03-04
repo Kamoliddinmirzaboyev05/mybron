@@ -1,18 +1,31 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../lib/AuthContext';
 import BottomNav from '../components/BottomNav';
+import NotificationSkeleton from '../components/NotificationSkeleton';
 import { Bell, CheckCircle, Clock, XCircle } from 'lucide-react';
 
 export default function Notifications() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Auth loading tugaguncha kutish
+    if (authLoading) {
+      return;
+    }
+
     if (!user) {
       navigate('/login');
+      return;
     }
-  }, [user, navigate]);
+
+    // Simulate loading notifications
+    setTimeout(() => {
+      setLoading(false);
+    }, 500);
+  }, [user, navigate, authLoading]);
 
   // Mock notifications - in production, these would come from a database
   const notifications = [
@@ -65,16 +78,28 @@ export default function Notifications() {
 
   return (
     <div className="min-h-screen bg-slate-950 pb-20">
-      <div className="max-w-md mx-auto">
+      {authLoading ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-slate-400">Yuklanmoqda...</div>
+        </div>
+      ) : (
+        <div className="max-w-md mx-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-slate-950 z-10 px-4 py-6 border-b border-slate-800">
+        <div className="sticky top-0 bg-slate-950 z-10 px-4 py-6 border-b border-slate-800 animate-fadeInUp">
           <h1 className="text-2xl font-bold text-white">Notifications</h1>
           <p className="text-slate-400 text-sm mt-1">Stay updated on your bookings</p>
         </div>
 
         {/* Notifications List */}
-        <div className="divide-y divide-slate-800">
-          {notifications.map((notification) => (
+        <div className="divide-y divide-slate-800 animate-fadeInUp" style={{ animationDelay: '0.1s' }}>
+          {loading ? (
+            <>
+              {[...Array(4)].map((_, i) => (
+                <NotificationSkeleton key={i} />
+              ))}
+            </>
+          ) : (
+            notifications.map((notification) => (
             <div
               key={notification.id}
               className={`px-4 py-4 hover:bg-slate-900/50 cursor-pointer transition-colors ${
@@ -99,10 +124,11 @@ export default function Notifications() {
                 </div>
               </div>
             </div>
-          ))}
+          ))
+          )}
         </div>
 
-        {notifications.length === 0 && (
+        {!loading && notifications.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20">
             <Bell className="w-16 h-16 text-slate-700 mb-4" />
             <div className="text-slate-400 text-center">
@@ -112,6 +138,7 @@ export default function Notifications() {
           </div>
         )}
       </div>
+      )}
 
       <BottomNav />
     </div>

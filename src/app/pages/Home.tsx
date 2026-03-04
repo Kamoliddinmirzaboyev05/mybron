@@ -17,6 +17,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [pitchRatings, setPitchRatings] = useState<Map<string, number>>(new Map());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,6 +43,10 @@ export default function Home() {
         console.error('Error fetching pitches:', error);
       } else {
         setPitches(data || []);
+        // Fetch ratings for all pitches
+        if (data && data.length > 0) {
+          fetchPitchRatings(data.map(p => p.id));
+        }
       }
     } catch (err) {
       console.error('Exception while fetching pitches:', err);
@@ -60,7 +65,10 @@ export default function Home() {
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error fetching favorites:', error);
+        // Ignore PGRST116 (no rows) error - table exists but empty
+        if (error.code !== 'PGRST116') {
+          console.error('Error fetching favorites:', error);
+        }
       } else {
         const favoriteIds = new Set(data?.map(f => f.pitch_id) || []);
         setFavorites(favoriteIds);
@@ -70,15 +78,56 @@ export default function Home() {
     }
   };
 
+  const fetchPitchRatings = async (pitchIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('pitch_id, rating')
+        .in('pitch_id', pitchIds);
+
+      if (error) {
+        // Ignore PGRST116 (no rows) error - table exists but empty
+        if (error.code !== 'PGRST116') {
+          console.error('Error fetching ratings:', error);
+        }
+        return;
+      }
+
+      // Calculate average ratings per pitch
+      const ratingsMap = new Map<string, number>();
+      const countsMap = new Map<string, number>();
+
+      data?.forEach((review: any) => {
+        const currentSum = ratingsMap.get(review.pitch_id) || 0;
+        const currentCount = countsMap.get(review.pitch_id) || 0;
+        ratingsMap.set(review.pitch_id, currentSum + review.rating);
+        countsMap.set(review.pitch_id, currentCount + 1);
+      });
+
+      // Calculate averages
+      const averages = new Map<string, number>();
+      ratingsMap.forEach((sum, pitchId) => {
+        const count = countsMap.get(pitchId) || 1;
+        averages.set(pitchId, sum / count);
+      });
+
+      setPitchRatings(averages);
+    } catch (err) {
+      console.error('Exception while fetching ratings:', err);
+    }
+  };
+
   const handleFavoriteToggle = async (pitchId: string) => {
     if (!user) {
       navigate('/login');
       return;
     }
 
+    const isFavorited = favorites.has(pitchId);
+
     // Optimistic UI update
     const newFavorites = new Set(favorites);
-    if (newFavorites.has(pitchId)) {
+    if (isFavorited) {
       newFavorites.delete(pitchId);
     } else {
       newFavorites.add(pitchId);
@@ -86,23 +135,36 @@ export default function Home() {
     setFavorites(newFavorites);
 
     try {
-      if (favorites.has(pitchId)) {
+      if (isFavorited) {
         // Remove favorite
-        await supabase
+        const { error } = await supabase
           .from('favorites')
           .delete()
           .eq('user_id', user.id)
           .eq('pitch_id', pitchId);
+
+        if (error) throw error;
       } else {
         // Add favorite
-        await supabase
+        const { error } = await supabase
           .from('favorites')
-          .insert({ user_id: user.id, pitch_id: pitchId });
+          .insert({ 
+            user_id: user.id, 
+            pitch_id: pitchId 
+          });
+
+        if (error) throw error;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error toggling favorite:', err);
       // Revert on error
       setFavorites(favorites);
+      
+      // Show user-friendly error message
+      if (err.code === 'PGRST204' || err.code === '23505') {
+        // Duplicate or already exists - just refresh
+        fetchFavorites();
+      }
     }
   };
 
@@ -203,7 +265,7 @@ export default function Home() {
                     isFavorite={favorites.has(pitch.id)}
                     onFavoriteToggle={handleFavoriteToggle}
                     distance={pitch.latitude && pitch.longitude ? Math.random() * 5 + 0.5 : undefined}
-                    rating={4.5 + Math.random() * 0.5}
+                    rating={pitchRatings.get(pitch.id)}
                   />
                 ))}
               </div>

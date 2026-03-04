@@ -27,15 +27,17 @@ export default function ReviewsSection({ pitchId }: ReviewsSectionProps) {
         .select(`
           *,
           profiles (
-            full_name,
-            email
+            full_name
           )
         `)
         .eq('pitch_id', pitchId)
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching reviews:', error);
+        // Ignore PGRST116 (no rows) error - table exists but empty
+        if (error.code !== 'PGRST116') {
+          console.error('Error fetching reviews:', error);
+        }
       } else {
         setReviews(data || []);
       }
@@ -181,7 +183,7 @@ export default function ReviewsSection({ pitchId }: ReviewsSectionProps) {
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-white font-medium">
-                      {review.profiles?.full_name || review.profiles?.email?.split('@')[0] || 'Foydalanuvchi'}
+                      {review.profiles?.full_name || 'Foydalanuvchi'}
                     </span>
                     <div className="flex items-center gap-1">
                       <Star className="w-4 h-4 text-yellow-400 fill-current" />

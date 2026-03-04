@@ -17,7 +17,7 @@ export default function EnhancedPitchCard({
   isFavorite, 
   onFavoriteToggle,
   distance,
-  rating = 4.5
+  rating
 }: EnhancedPitchCardProps) {
   const navigate = useNavigate();
   const [isAnimating, setIsAnimating] = useState(false);
@@ -52,11 +52,13 @@ export default function EnhancedPitchCard({
           />
         </button>
 
-        {/* Rating Badge */}
-        <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-lg">
-          <Star className="w-3 h-3 text-yellow-400 fill-current" />
-          <span className="text-white text-xs font-semibold">{rating.toFixed(1)}</span>
-        </div>
+        {/* Rating Badge - only show if rating exists */}
+        {rating !== undefined && (
+          <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-lg">
+            <Star className="w-3 h-3 text-yellow-400 fill-current" />
+            <span className="text-white text-xs font-semibold">{rating.toFixed(1)}</span>
+          </div>
+        )}
 
         {/* Distance Badge */}
         {distance && (
