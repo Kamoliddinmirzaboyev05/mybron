@@ -6,6 +6,7 @@ import Notifications from "./pages/Notifications";
 import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AdminDashboard from "./pages/AdminDashboard";
 
 export const router = createBrowserRouter([
   {
@@ -35,5 +36,9 @@ export const router = createBrowserRouter([
   {
     path: "/profile",
     Component: Profile,
+  },
+  {
+    path: "/admin",
+    Component: AdminDashboard,
   },
 ]);

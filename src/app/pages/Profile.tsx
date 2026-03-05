@@ -111,6 +111,21 @@ export default function Profile() {
                   <div className="text-white">{displayPhone}</div>
                 </div>
               </div>
+              {profile?.role === 'admin' && (
+                <button
+                  onClick={() => navigate('/admin')}
+                  className="w-full px-4 py-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors border-t border-blue-500/30 bg-blue-500/10"
+                >
+                  <div className="flex items-center gap-3">
+                    <User className="w-5 h-5 text-blue-400" />
+                    <div className="text-left">
+                      <div className="text-white font-medium">Admin Dashboard</div>
+                      <div className="text-xs text-blue-400">Boshqaruv paneli</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-blue-400" />
+                </button>
+              )}
             </div>
           </div>
 

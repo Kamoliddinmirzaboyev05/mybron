@@ -78,3 +78,13 @@ export interface Review {
   created_at?: string;
   profiles?: Profile;
 }
+
+export interface PitchSlot {
+  id: string;
+  pitch_id: string;
+  slot_date: string; // DATE format (YYYY-MM-DD)
+  slot_time: string; // TIME format (HH:MM:SS)
+  is_available: boolean;
+  created_at?: string;
+  updated_at?: string;
+}

@@ -86,32 +86,101 @@ export default function PitchDetails() {
     if (!id || !selectedDateForBooking) return;
 
     try {
-      // Only fetch confirmed and pending bookings - cancelled/rejected are available
+      // NEW APPROACH: Fetch from pitch_slots table
+      // Get all slots for this pitch and date where is_available = false
       const { data, error } = await supabase
-        .from('bookings')
-        .select('start_time, end_time')
+        .from('pitch_slots')
+        .select('slot_time, is_available')
         .eq('pitch_id', id)
-        .eq('booking_date', selectedDateForBooking)
-        .in('status', ['pending', 'confirmed', 'manual']);
+        .eq('slot_date', selectedDateForBooking)
+        .eq('is_available', false)
+        .order('slot_time', { ascending: true });
 
       if (error) {
-        console.error('Error fetching bookings:', error);
-      } else {
-        const slots = new Set<string>();
-        data?.forEach((item: any) => {
-          // Mark all hours in the booking range as booked
-          const startHour = parseInt(item.start_time.split(':')[0]);
-          const endHour = parseInt(item.end_time.split(':')[0]);
-          
-          for (let hour = startHour; hour < endHour; hour++) {
-            const timeSlot = `${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00`;
-            slots.add(timeSlot);
-          }
+        console.error('❌ XATOLIK:', error);
+        toast.error('Xatolik yuz berdi', {
+          description: 'Bandlik ma\'lumotlarini yuklab bo\'lmadi.'
         });
+      } else {
+        console.log('\n╔═══════════════════════════════════════════════════════════════════╗');
+        console.log('║  🔍 PITCHDETAILS - BAND VAQTLARNI OLISH (pitch_slots)           ║');
+        console.log('╚═══════════════════════════════════════════════════════════════════╝');
+        
+        console.log('\n📥 DATABASE QUERY PARAMETRLARI:');
+        console.log('   ├─ Jadval: pitch_slots');
+        console.log('   ├─ pitch_id:', id);
+        console.log('   ├─ slot_date:', selectedDateForBooking);
+        console.log('   └─ is_available: false (faqat band slotlar)');
+        
+        console.log('\n📊 DATABASE DAN KELGAN MA\'LUMOT:');
+        console.log('   └─ Topilgan band slotlar soni:', data?.length || 0);
+        
+        if (data && data.length > 0) {
+          console.log('\n📋 PITCH_SLOTS JADVALIDAGI BAND SLOTLAR:');
+          console.log('   ┌─────────────────────────────────────────────────────────┐');
+          data.forEach((slot, index) => {
+            console.log(`   │ Slot #${index + 1}:`);
+            console.log('   │  ├─ slot_time:', slot.slot_time);
+            console.log('   │  └─ is_available:', slot.is_available);
+            if (index < data.length - 1) {
+              console.log('   │');
+            }
+          });
+          console.log('   └─────────────────────────────────────────────────────────┘');
+        } else {
+          console.log('\n   ℹ️  Hech qanday band slot topilmadi (barcha vaqtlar bo\'sh)');
+        }
+        
+        const slots = new Set<string>();
+        
+        console.log('\n🔄 SLOTLARNI QAYTA ISHLASH:');
+        
+        data?.forEach((item: any, index: number) => {
+          console.log(`\n   ┌─ Slot #${index + 1} ni qayta ishlash:`);
+          
+          // Normalize time by stripping seconds (HH:mm format)
+          const slotTime = item.slot_time.substring(0, 5); // "HH:mm"
+          
+          console.log('   │  ├─ Original (database):', item.slot_time);
+          console.log('   │  └─ Normalized (HH:mm):', slotTime);
+          
+          // Convert to hour slot format (e.g., "14:00 - 15:00")
+          const [hour] = slotTime.split(':').map(Number);
+          const timeSlot = `${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00`;
+          
+          console.log('   │  └─ Slot format:', timeSlot);
+          
+          slots.add(timeSlot);
+        });
+        
         setBookedSlots(slots);
+        
+        console.log('\n╔═══════════════════════════════════════════════════════════════════╗');
+        console.log('║  📊 YAKUNIY NATIJA (bookedSlots Set ga saqlandi)                ║');
+        console.log('╚═══════════════════════════════════════════════════════════════════╝');
+        console.log('\n🔒 Band slotlar (Set):');
+        if (slots.size > 0) {
+          Array.from(slots).forEach((slot, index) => {
+            console.log(`   ${index + 1}. ${slot}`);
+          });
+        } else {
+          console.log('   (bo\'sh - hech qanday slot band emas)');
+        }
+        console.log('\n📈 Statistika:');
+        console.log('   ├─ Jami band slotlar:', slots.size, 'ta');
+        console.log('   ├─ Qayta ishlangan slotlar:', data?.length || 0, 'ta');
+        console.log('   └─ Sana:', selectedDateForBooking);
+        
+        console.log('\n💾 KEYINGI QADAM:');
+        console.log('   └─ Bu Set BookingModal → TimeSlotPicker ga props orqali uzatiladi');
+        
+        console.log('\n═══════════════════════════════════════════════════════════════════\n');
       }
     } catch (err) {
-      console.error('Exception while fetching bookings:', err);
+      console.error('Exception while fetching slots:', err);
+      toast.error('Xatolik yuz berdi', {
+        description: 'Qaytadan urinib ko\'ring.'
+      });
     }
   };
 
@@ -137,10 +206,17 @@ export default function PitchDetails() {
       } else {
         // Fallback: copy to clipboard
         await navigator.clipboard.writeText(window.location.href);
-        alert('Havola nusxalandi!');
+        toast.success('Havola nusxalandi!', {
+          description: 'Havola clipboardga nusxalandi.'
+        });
       }
     } catch (err) {
       console.error('Error sharing:', err);
+      if (err instanceof Error && err.name !== 'AbortError') {
+        toast.error('Xatolik yuz berdi', {
+          description: 'Havolani ulashib bo\'lmadi.'
+        });
+      }
     }
   };
 
@@ -179,45 +255,61 @@ export default function PitchDetails() {
       const startHour = Math.min(...slotHours);
       const endHour = Math.max(...slotHours) + 1;
 
-      // Double-check availability for each hour in the range
-      const { data: existingBookings, error: checkError } = await supabase
-        .from('bookings')
-        .select('start_time, end_time')
+      // CRITICAL FIX: Double-check availability right before insert
+      // Check pitch_slots table to ensure all requested slots are available
+      const { data: existingSlots, error: checkError } = await supabase
+        .from('pitch_slots')
+        .select('slot_time, is_available')
         .eq('pitch_id', id)
-        .eq('booking_date', dateStr)
-        .in('status', ['pending', 'confirmed', 'manual']);
+        .eq('slot_date', dateStr)
+        .eq('is_available', false);
 
       if (checkError) {
         console.error('Error checking availability:', checkError);
-        toast.error('Xatolik yuz berdi', { id: loadingToast });
+        toast.error('Xatolik yuz berdi', { 
+          id: loadingToast,
+          description: 'Bandlik tekshirilmadi. Qaytadan urinib ko\'ring.'
+        });
         return;
       }
 
-      // Check if any hour in our range is already booked
+      // Check if any of our requested slots are unavailable
       let hasConflict = false;
-      existingBookings?.forEach((booking: any) => {
-        const bookedStart = parseInt(booking.start_time.split(':')[0]);
-        const bookedEnd = parseInt(booking.end_time.split(':')[0]);
+      let conflictDetails = '';
+      
+      existingSlots?.forEach((slot: any) => {
+        const slotHour = parseInt(slot.slot_time.substring(0, 2));
         
-        for (let hour = startHour; hour < endHour; hour++) {
-          if (hour >= bookedStart && hour < bookedEnd) {
-            hasConflict = true;
-            break;
-          }
+        // Check if this unavailable slot is in our requested range
+        if (slotHour >= startHour && slotHour < endHour) {
+          hasConflict = true;
+          conflictDetails = slot.slot_time.substring(0, 5);
         }
       });
 
       if (hasConflict) {
+        console.warn('Booking conflict detected (pitch_slots):', conflictDetails);
         toast.error('Bu vaqt band!', { 
           id: loadingToast,
           description: 'Tanlangan vaqtda boshqa bron mavjud. Iltimos, boshqa vaqt tanlang.'
         });
+        // Refresh booked slots to show updated availability
+        await fetchBookedSlots();
         return;
       }
 
       // Format times as HH:MM:SS for time type
       const startTimeFormatted = `${startHour.toString().padStart(2, '0')}:00:00`;
       const endTimeFormatted = `${endHour.toString().padStart(2, '0')}:00:00`;
+
+      console.log('Creating booking:', {
+        pitch_id: id,
+        booking_date: dateStr,
+        start_time: startTimeFormatted,
+        end_time: endTimeFormatted,
+        total_hours: totalHours,
+        total_price: totalPrice
+      });
 
       const { error } = await supabase.from('bookings').insert({
         pitch_id: id,
@@ -234,12 +326,14 @@ export default function PitchDetails() {
       if (error) {
         console.error('Error creating booking:', error);
         
-        // Check for overlap error from trigger
-        if (error.message && (error.message.includes('overlap') || error.message.includes('bron'))) {
+        // Check for overlap error from trigger or constraint
+        if (error.message && (error.message.includes('overlap') || error.message.includes('bron') || error.message.includes('conflict'))) {
           toast.error('Bu vaqt band!', { 
             id: loadingToast,
             description: 'Tanlangan vaqtda boshqa bron mavjud.'
           });
+          // Refresh booked slots
+          await fetchBookedSlots();
         } else {
           toast.error('Xatolik yuz berdi', { 
             id: loadingToast,
@@ -248,13 +342,15 @@ export default function PitchDetails() {
         }
         throw error;
       } else {
+        console.log('Booking created successfully');
         toast.success('Muvaffaqiyatli band qilindi!', { 
           id: loadingToast,
           description: 'Admin tasdiqlashini kuting.'
         });
         setShowBookingModal(false);
         setShowSuccess(true);
-        fetchBookedSlots();
+        // Refresh booked slots to reflect the new booking
+        await fetchBookedSlots();
       }
     } catch (err: any) {
       console.error('Exception while creating booking:', err);

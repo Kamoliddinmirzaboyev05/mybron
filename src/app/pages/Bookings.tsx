@@ -87,7 +87,9 @@ export default function Bookings() {
   };
 
   const handleCancelBooking = async (bookingId: string) => {
-    if (!confirm('Bronni bekor qilmoqchimisiz?')) {
+    // Use a more user-friendly confirmation approach
+    const confirmCancel = window.confirm('Bronni bekor qilmoqchimisiz?');
+    if (!confirmCancel) {
       return;
     }
 
@@ -113,7 +115,7 @@ export default function Bookings() {
           description: 'Vaqt endi boshqalar uchun ochiq.'
         });
         // Real-time subscription will auto-update
-        console.log('Booking cancelled successfully');
+        console.log('Booking cancelled successfully, status set to cancelled');
       }
     } catch (err) {
       console.error('Exception while canceling booking:', err);

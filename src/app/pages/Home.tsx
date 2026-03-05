@@ -8,6 +8,8 @@ import PitchCardSkeleton from '../components/PitchCardSkeleton';
 import SearchBar from '../components/SearchBar';
 import QuickFilters from '../components/QuickFilters';
 import { useNavigate } from 'react-router';
+import { getUserLocation, calculateDistance, formatDistance, Coordinates } from '../lib/geoUtils';
+import { MapPin, Users, Star, TrendingUp } from 'lucide-react';
 
 export default function Home() {
   const { user } = useAuth();
@@ -18,10 +20,16 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [pitchRatings, setPitchRatings] = useState<Map<string, number>>(new Map());
+  const [pitchDistances, setPitchDistances] = useState<Map<string, number>>(new Map());
+  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [averageRating, setAverageRating] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchPitches();
+    fetchStatistics();
+    getUserLocationData();
     if (user) {
       fetchFavorites();
     }
@@ -29,7 +37,15 @@ export default function Home() {
 
   useEffect(() => {
     applyFilters();
-  }, [pitches, searchQuery, activeFilter]);
+  }, [pitches, searchQuery, activeFilter, pitchDistances, userLocation]);
+
+  const getUserLocationData = async () => {
+    const location = await getUserLocation();
+    if (location) {
+      setUserLocation(location);
+      console.log('User location obtained:', location);
+    }
+  };
 
   const fetchPitches = async () => {
     try {
@@ -47,11 +63,54 @@ export default function Home() {
         if (data && data.length > 0) {
           fetchPitchRatings(data.map(p => p.id));
         }
+        // Calculate distances if user location is available
+        if (userLocation && data) {
+          calculatePitchDistances(data, userLocation);
+        }
       }
     } catch (err) {
       console.error('Exception while fetching pitches:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const calculatePitchDistances = (pitchList: Pitch[], location: Coordinates) => {
+    const distances = new Map<string, number>();
+    pitchList.forEach(pitch => {
+      if (pitch.latitude && pitch.longitude) {
+        const distance = calculateDistance(location, {
+          latitude: pitch.latitude,
+          longitude: pitch.longitude
+        });
+        distances.set(pitch.id, distance);
+      }
+    });
+    setPitchDistances(distances);
+  };
+
+  const fetchStatistics = async () => {
+    try {
+      // Fetch total users count
+      const { count: usersCount, error: usersError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      if (!usersError && usersCount !== null) {
+        setTotalUsers(usersCount);
+      }
+
+      // Fetch average rating
+      const { data: reviewsData, error: reviewsError } = await supabase
+        .from('reviews')
+        .select('rating');
+
+      if (!reviewsError && reviewsData && reviewsData.length > 0) {
+        const avgRating = reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length;
+        setAverageRating(avgRating);
+      }
+    } catch (err) {
+      console.error('Exception fetching statistics:', err);
     }
   };
 
@@ -194,6 +253,15 @@ export default function Home() {
         const end = parseInt(pitch.end_time?.split(':')[0] || '0');
         return start === 0 && end === 24;
       });
+    } else if (activeFilter === 'nearby') {
+      // Sort by distance (closest first)
+      if (userLocation && pitchDistances.size > 0) {
+        filtered.sort((a, b) => {
+          const distA = pitchDistances.get(a.id) || Infinity;
+          const distB = pitchDistances.get(b.id) || Infinity;
+          return distA - distB;
+        });
+      }
     }
 
     setFilteredPitches(filtered);
@@ -233,6 +301,50 @@ export default function Home() {
         {/* Setup Banner */}
         {!isSupabaseConfigured && <SetupBanner />}
 
+        {/* Statistics Bar - Social Proof */}
+        <div className="px-4 py-6 border-b border-slate-800">
+          <div className="grid grid-cols-3 gap-4">
+            {/* Total Pitches */}
+            <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-xl p-4 text-center">
+              <div className="flex items-center justify-center mb-2">
+                <div className="p-2 bg-blue-500/20 rounded-lg">
+                  <MapPin className="w-5 h-5 text-blue-400" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-white mb-1">
+                {pitches.length}+
+              </div>
+              <div className="text-xs text-slate-400">Maydonlar</div>
+            </div>
+
+            {/* Total Users */}
+            <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 rounded-xl p-4 text-center">
+              <div className="flex items-center justify-center mb-2">
+                <div className="p-2 bg-green-500/20 rounded-lg">
+                  <Users className="w-5 h-5 text-green-400" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-white mb-1">
+                {totalUsers}+
+              </div>
+              <div className="text-xs text-slate-400">Foydalanuvchilar</div>
+            </div>
+
+            {/* Average Rating */}
+            <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border border-yellow-500/20 rounded-xl p-4 text-center">
+              <div className="flex items-center justify-center mb-2">
+                <div className="p-2 bg-yellow-500/20 rounded-lg">
+                  <Star className="w-5 h-5 text-yellow-400" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-white mb-1">
+                {averageRating > 0 ? averageRating.toFixed(1) : '5.0'}
+              </div>
+              <div className="text-xs text-slate-400">O'rtacha reyting</div>
+            </div>
+          </div>
+        </div>
+
         {/* Pitches List */}
         <div className="px-4 py-4">
             {loading ? (
@@ -264,7 +376,7 @@ export default function Home() {
                     pitch={pitch}
                     isFavorite={favorites.has(pitch.id)}
                     onFavoriteToggle={handleFavoriteToggle}
-                    distance={pitch.latitude && pitch.longitude ? Math.random() * 5 + 0.5 : undefined}
+                    distance={pitchDistances.get(pitch.id)}
                     rating={pitchRatings.get(pitch.id)}
                   />
                 ))}

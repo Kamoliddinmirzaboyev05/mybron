@@ -57,9 +57,7 @@ export default function TimeSlotPicker({
   };
 
   const handleSlotClick = (slot: string) => {
-    const isBooked = bookedSlots.has(slot);
-    if (isBooked) return;
-
+    // No need to check isBooked since booked slots are now hidden from UI
     const isSelected = selectedSlots.includes(slot);
 
     if (isSelected) {
@@ -164,28 +162,89 @@ export default function TimeSlotPicker({
 
       {/* Time Slots Grid - 2 columns */}
       <div className="grid grid-cols-2 gap-3 px-4">
-        {slots.map((slot) => {
-          const isBooked = bookedSlots.has(slot);
-          const isSelected = selectedSlots.includes(slot);
+        {(() => {
+          const availableSlots = slots.filter(slot => !bookedSlots.has(slot));
+          
+          console.log('\n╔════════════════════════════════════════════════════════╗');
+          console.log('║  📊 TIMESLOTPICKER - VAQT SLOTLARI TAHLILI           ║');
+          console.log('╚════════════════════════════════════════════════════════╝');
+          
+          console.log('\n📥 KIRUVCHI MA\'LUMOTLAR:');
+          console.log('   ├─ slots (props dan):', slots);
+          console.log('   │  └─ Jami:', slots.length, 'ta slot');
+          console.log('   │');
+          console.log('   └─ bookedSlots (props dan):', Array.from(bookedSlots));
+          console.log('      └─ Jami:', bookedSlots.size, 'ta band slot');
+          
+          console.log('\n🔍 FILTRLASH JARAYONI:');
+          console.log('   Har bir slot uchun tekshirish: bookedSlots.has(slot)');
+          
+          // Show which slots are filtered out
+          const filteredOutSlots = slots.filter(slot => bookedSlots.has(slot));
+          if (filteredOutSlots.length > 0) {
+            console.log('\n   ❌ BAND SLOTLAR (ko\'rsatilmaydi):');
+            filteredOutSlots.forEach(slot => {
+              console.log('      ├─', slot, '← bookedSlots da mavjud');
+            });
+          }
+          
+          if (availableSlots.length > 0) {
+            console.log('\n   ✅ BO\'SH SLOTLAR (ko\'rsatiladi):');
+            availableSlots.forEach(slot => {
+              console.log('      ├─', slot, '← bookedSlots da yo\'q');
+            });
+          }
+          
+          console.log('\n📊 YAKUNIY NATIJA:');
+          console.log('   ├─ Band slotlar:', bookedSlots.size, 'ta');
+          console.log('   ├─ Bo\'sh slotlar:', availableSlots.length, 'ta');
+          console.log('   └─ Jami slotlar:', slots.length, 'ta');
+          
+          console.log('\n💡 MANBA:');
+          console.log('   ├─ slots → BookingModal.tsx dan keladi');
+          console.log('   ├─ bookedSlots → PitchDetails.tsx dan keladi');
+          console.log('   └─ bookedSlots → fetchBookedSlots() funksiyasidan to\'ldiriladi');
+          
+          console.log('\n════════════════════════════════════════════════════════\n');
+          
+          return availableSlots.map((slot) => {
+            const isSelected = selectedSlots.includes(slot);
+            
+            return (
+              <button
+                key={slot}
+                onClick={() => handleSlotClick(slot)}
+                className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
+                  isSelected
+                    ? 'bg-green-600 text-white border-2 border-green-500 shadow-lg'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-blue-500'
+                }`}
+              >
+                {slot}
+              </button>
+            );
+          });
+        })()}
+      </div>
+      
+      {/* Show message if no slots available */}
+      {(() => {
+        const availableSlots = slots.filter(slot => !bookedSlots.has(slot));
+        
+        if (availableSlots.length === 0) {
+          console.warn('⚠️ DIQQAT: Barcha vaqtlar band!');
+          console.log('Jami slotlar:', slots.length);
+          console.log('Band slotlar:', bookedSlots.size);
           
           return (
-            <button
-              key={slot}
-              onClick={() => handleSlotClick(slot)}
-              disabled={isBooked}
-              className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
-                isBooked
-                  ? 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700 opacity-50'
-                  : isSelected
-                  ? 'bg-green-600 text-white border-2 border-green-500 shadow-lg'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-blue-500'
-              }`}
-            >
-              {slot}
-            </button>
+            <div className="px-4 py-8 text-center">
+              <div className="text-slate-400 mb-2">Barcha vaqtlar band</div>
+              <div className="text-sm text-slate-500">Iltimos, boshqa sana tanlang</div>
+            </div>
           );
-        })}
-      </div>
+        }
+        return null;
+      })()}
 
       {/* Selected Range Summary */}
       {selectedSlots.length > 0 && (
@@ -211,21 +270,26 @@ export default function TimeSlotPicker({
         </div>
       )}
       
-      {/* Legend */}
+      {/* Legend - Updated to reflect that booked slots are hidden */}
       <div className="flex gap-4 mt-4 px-4 text-xs">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-green-600" />
           <span className="text-slate-400">Tanlangan</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-slate-700 opacity-50" />
-          <span className="text-slate-400">Band</span>
-        </div>
-        <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-slate-800 border border-slate-700" />
           <span className="text-slate-400">Bo'sh</span>
         </div>
       </div>
+      
+      {/* Info message about hidden booked slots */}
+      {bookedSlots.size > 0 && (
+        <div className="mt-3 px-4">
+          <div className="text-xs text-slate-500 text-center">
+            Band qilingan vaqtlar ko'rsatilmaydi
+          </div>
+        </div>
+      )}
     </div>
   );
 }
