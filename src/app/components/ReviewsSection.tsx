@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Star, User } from 'lucide-react';
-import { supabase, Review } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 
 interface ReviewsSectionProps {

@@ -1,13 +1,11 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { api, User, AuthResponse } from './api';
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, fullName: string, phone: string) => Promise<{ error: any }>;
+  signIn: (login: string, password: string) => Promise<{ error: any }>;
+  signUp: (fullName: string, login: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -15,57 +13,62 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Check if user is already logged in
+    const token = api.getToken();
+    const storedUser = api.getUser();
+    
+    if (token && storedUser) {
+      // Verify token is still valid
+      api.getProfile()
+        .then(profile => {
+          setUser(profile);
+          setLoading(false);
+        })
+        .catch(() => {
+          // Token is invalid, clear it
+          api.clearToken();
+          setUser(null);
+          setLoading(false);
+        });
+    } else {
       setLoading(false);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
+    }
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+  const signIn = async (login: string, password: string) => {
+    try {
+      const response = await api.login({ login, password });
+      api.setToken(response.token);
+      api.setUser(response.user);
+      setUser(response.user);
+      return { error: null };
+    } catch (error: any) {
+      return { error };
+    }
   };
 
-  const signUp = async (email: string, password: string, fullName: string, phone: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          role: 'user',
-          full_name: fullName,
-          phone: phone,
-        },
-      },
-    });
-    return { error };
+  const signUp = async (fullName: string, login: string, password: string) => {
+    try {
+      const response = await api.register({ fullName, login, password, role: 'user' });
+      api.setToken(response.token);
+      api.setUser(response.user);
+      setUser(response.user);
+      return { error: null };
+    } catch (error: any) {
+      return { error };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await api.logout();
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

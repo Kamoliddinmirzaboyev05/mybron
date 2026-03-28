@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { supabase, Booking, Profile } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import { toast } from 'sonner';
 import { 

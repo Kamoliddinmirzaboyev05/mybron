@@ -1,26 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { useAuth } from '../lib/AuthContext';
-import { Mail, Lock, User, Phone, AlertCircle, CheckCircle } from 'lucide-react';
-import { formatPhoneNumber, cleanPhoneNumber, isValidUzbekPhone } from '../lib/phoneFormatter';
+import { api } from '../lib/api';
+import { Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function Register() {
   const navigate = useNavigate();
-  const { signUp, user, loading: authLoading } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('+998 ');
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // Agar user allaqachon login qilgan bo'lsa, bosh sahifaga yo'naltirish
+  // Check if user is already logged in
   useEffect(() => {
-    if (!authLoading && user) {
-      navigate('/');
+    const token = api.getToken();
+    if (token) {
+      api.getProfile()
+        .then(profile => {
+          navigate('/');
+        })
+        .catch(() => {
+          api.clearToken();
+        });
     }
-  }, [user, authLoading, navigate]);
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,20 +37,13 @@ export default function Register() {
       return;
     }
 
-    if (!isValidUzbekPhone(phone)) {
-      setError('Iltimos, to\'g\'ri telefon raqam kiriting (+998 XX XXX XX XX)');
-      setLoading(false);
-      return;
-    }
-
-    const cleanedPhone = cleanPhoneNumber(phone);
-    const { error } = await signUp(email, password, fullName, cleanedPhone);
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
+    try {
+      const response = await api.register({ fullName, login, password, role: 'user' });
+      api.setToken(response.token);
       setSuccess(true);
+      setLoading(false);
+    } catch (error: any) {
+      setError(error.message || 'Registration failed');
       setLoading(false);
     }
   };
@@ -63,7 +60,7 @@ export default function Register() {
           </div>
           <h1 className="text-2xl font-bold text-white mb-3">Registration Successful!</h1>
           <p className="text-slate-400 mb-6">
-            Please check your email to verify your account. Once verified, you can sign in.
+            Your account has been created successfully. You can now sign in.
           </p>
           <button
             onClick={() => {
@@ -77,7 +74,7 @@ export default function Register() {
             }}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition-colors"
           >
-            Kirish sahifasiga o'tish
+            Go to Login
           </button>
         </div>
       </div>
@@ -86,10 +83,7 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4 py-8">
-      {authLoading ? (
-        <div className="text-slate-400">Yuklanmoqda...</div>
-      ) : (
-        <div className="max-w-md w-full">
+      <div className="max-w-md w-full">
         {/* Logo/Header */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden bg-white/5 p-2">
@@ -128,62 +122,19 @@ export default function Register() {
 
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Email Address
+              Login
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                type="text"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                placeholder="your login"
                 required
                 className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Telefon raqam
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => {
-                  const formatted = formatPhoneNumber(e.target.value);
-                  // +998 ni o'chirishga ruxsat bermaslik
-                  if (formatted.startsWith('+998')) {
-                    setPhone(formatted);
-                  } else {
-                    setPhone('+998 ');
-                  }
-                }}
-                onFocus={(e) => {
-                  // Agar bo'sh bo'lsa, +998 qo'shish
-                  if (!phone || phone.trim() === '') {
-                    setPhone('+998 ');
-                  }
-                  // Kursorni oxiriga o'tkazish
-                  setTimeout(() => {
-                    e.target.setSelectionRange(e.target.value.length, e.target.value.length);
-                  }, 0);
-                }}
-                onKeyDown={(e) => {
-                  // Backspace bilan +998 ni o'chirishga ruxsat bermaslik
-                  if (e.key === 'Backspace' && phone.length <= 5) {
-                    e.preventDefault();
-                    setPhone('+998 ');
-                  }
-                }}
-                placeholder="+998 90 123 45 67"
-                required
-                className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
-              />
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Format: +998 XX XXX XX XX</p>
           </div>
 
           <div>
@@ -227,7 +178,6 @@ export default function Register() {
           </p>
         </div>
       </div>
-      )}
     </div>
   );
 }

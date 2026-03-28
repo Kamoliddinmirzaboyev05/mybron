@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router';
 import BottomNav from '../components/BottomNav';
 import ProfileSkeleton from '../components/ProfileSkeleton';
 import { useAuth } from '../lib/AuthContext';
-import { supabase, Profile as ProfileType } from '../lib/supabase';
 import { User, Phone, Mail, Moon, Sun, LogOut, ChevronRight } from 'lucide-react';
 import { formatPhoneNumber } from '../lib/phoneFormatter';
 

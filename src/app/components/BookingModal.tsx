@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { Pitch, supabase } from '../lib/supabase';
 import { toDateString, filterPastSlots } from '../lib/dateUtils';
 import DatePicker from './DatePicker';
 import TimeSlotPicker from './TimeSlotPicker';

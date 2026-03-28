@@ -1,34 +1,41 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { useAuth } from '../lib/AuthContext';
+import { api } from '../lib/api';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn, user, loading: authLoading } = useAuth();
-  const [email, setEmail] = useState('');
+  const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [user, setUser] = useState(null);
 
-  // Agar user allaqachon login qilgan bo'lsa, bosh sahifaga yo'naltirish
+  // Check if user is already logged in
   useEffect(() => {
-    if (!authLoading && user) {
-      navigate('/');
+    const token = api.getToken();
+    if (token) {
+      api.getProfile()
+        .then(profile => {
+          setUser(profile);
+          navigate('/');
+        })
+        .catch(() => {
+          api.clearToken();
+        });
     }
-  }, [user, authLoading, navigate]);
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const { error } = await signIn(email, password);
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
+    try {
+      const response = await api.login({ login, password });
+      api.setToken(response.token);
+      setUser(response.user);
+      
       // Check if user was trying to book a pitch
       const returnToPitch = sessionStorage.getItem('returnToPitch');
       if (returnToPitch) {
@@ -37,15 +44,15 @@ export default function Login() {
       } else {
         navigate('/');
       }
+    } catch (error: any) {
+      setError(error.message || 'Login failed');
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
-      {authLoading ? (
-        <div className="text-slate-400">Yuklanmoqda...</div>
-      ) : (
-        <div className="max-w-md w-full">
+      <div className="max-w-md w-full">
         {/* Logo/Header */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden bg-white/5 p-2">
@@ -67,15 +74,15 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Email Address
+              Login
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                type="text"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                placeholder="your login"
                 required
                 className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
               />
@@ -121,7 +128,6 @@ export default function Login() {
           </p>
         </div>
       </div>
-      )}
     </div>
   );
 }

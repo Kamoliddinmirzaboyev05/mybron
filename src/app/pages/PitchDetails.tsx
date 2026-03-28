@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { supabase, Pitch, Booking } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import { toDateString, filterPastSlots } from '../lib/dateUtils';
-import { toast } from 'sonner';
 import { ArrowLeft, MapPin, Droplets, Car, Wifi, Coffee, Moon, Users, Shield, Zap, Clock, Calendar as CalendarIcon, Share2 } from 'lucide-react';
 import PitchImageSlider from '../components/PitchImageSlider';
 import BookingModal from '../components/BookingModal';

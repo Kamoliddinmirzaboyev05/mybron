@@ -1,15 +1,31 @@
 import { useEffect, useState } from 'react';
-import { supabase, Pitch, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import BottomNav from '../components/BottomNav';
-import SetupBanner from '../components/SetupBanner';
 import EnhancedPitchCard from '../components/EnhancedPitchCard';
 import PitchCardSkeleton from '../components/PitchCardSkeleton';
 import SearchBar from '../components/SearchBar';
 import QuickFilters from '../components/QuickFilters';
 import { useNavigate } from 'react-router';
 import { getUserLocation, calculateDistance, formatDistance, Coordinates } from '../lib/geoUtils';
-import { MapPin, Users, Star, TrendingUp } from 'lucide-react';
+import { MapPin, Users, Star } from 'lucide-react';
+
+// Types
+interface Pitch {
+  id: string;
+  name: string;
+  price_per_hour: number;
+  location: string;
+  landmark?: string;
+  start_time: string;
+  end_time: string;
+  latitude?: number;
+  longitude?: number;
+  images: string[];
+  amenities?: string[];
+  is_active: boolean;
+  owner_id?: string;
+  created_at?: string;
+}
 
 export default function Home() {
   const { user } = useAuth();
@@ -49,25 +65,58 @@ export default function Home() {
 
   const fetchPitches = async () => {
     try {
-      const { data, error } = await supabase
-        .from('pitches')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) {
-        console.error('Error fetching pitches:', error);
-      } else {
-        setPitches(data || []);
-        // Fetch ratings for all pitches
-        if (data && data.length > 0) {
-          fetchPitchRatings(data.map(p => p.id));
+      // Mock data for now - replace with actual API call
+      const mockPitches: Pitch[] = [
+        {
+          id: '1',
+          name: 'Sport Arena',
+          price_per_hour: 150000,
+          location: 'Toshkent, Chilonzor',
+          landmark: 'Chilonzor metro',
+          start_time: '08:00:00',
+          end_time: '22:00:00',
+          latitude: 41.2995,
+          longitude: 69.2401,
+          images: ['/pitch1.jpg'],
+          amenities: ['Dush', 'Wi-Fi'],
+          is_active: true,
+          owner_id: 'owner1',
+          created_at: '2024-01-01T00:00:00Z'
+        },
+        {
+          id: '2',
+          name: 'Football Field',
+          price_per_hour: 120000,
+          location: 'Toshkent, Yunusobod',
+          landmark: 'Yunusobod metro',
+          start_time: '06:00:00',
+          end_time: '24:00:00',
+          latitude: 41.3111,
+          longitude: 69.2797,
+          images: ['/pitch2.jpg'],
+          amenities: ['Dush', 'Parkovka'],
+          is_active: true,
+          owner_id: 'owner2',
+          created_at: '2024-01-01T00:00:00Z'
         }
-        // Calculate distances if user location is available
-        if (userLocation && data) {
-          calculatePitchDistances(data, userLocation);
-        }
+      ];
+      
+      setPitches(mockPitches);
+      
+      // Calculate distances if user location is available
+      if (userLocation && mockPitches) {
+        calculatePitchDistances(mockPitches, userLocation);
       }
+      
+      // Set mock ratings
+      setPitchRatings(new Map([
+        ['1', 4.5],
+        ['2', 4.2]
+      ]));
+      
+      // Set mock statistics
+      setTotalUsers(1500);
+      setAverageRating(4.3);
     } catch (err) {
       console.error('Exception while fetching pitches:', err);
     } finally {
@@ -90,90 +139,16 @@ export default function Home() {
   };
 
   const fetchStatistics = async () => {
-    try {
-      // Fetch total users count
-      const { count: usersCount, error: usersError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-
-      if (!usersError && usersCount !== null) {
-        setTotalUsers(usersCount);
-      }
-
-      // Fetch average rating
-      const { data: reviewsData, error: reviewsError } = await supabase
-        .from('reviews')
-        .select('rating');
-
-      if (!reviewsError && reviewsData && reviewsData.length > 0) {
-        const avgRating = reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length;
-        setAverageRating(avgRating);
-      }
-    } catch (err) {
-      console.error('Exception fetching statistics:', err);
-    }
+    // Mock statistics
+    setTotalUsers(1500);
+    setAverageRating(4.3);
   };
 
   const fetchFavorites = async () => {
     if (!user) return;
     
-    try {
-      const { data, error } = await supabase
-        .from('favorites')
-        .select('pitch_id')
-        .eq('user_id', user.id);
-
-      if (error) {
-        // Ignore PGRST116 (no rows) error - table exists but empty
-        if (error.code !== 'PGRST116') {
-          console.error('Error fetching favorites:', error);
-        }
-      } else {
-        const favoriteIds = new Set(data?.map(f => f.pitch_id) || []);
-        setFavorites(favoriteIds);
-      }
-    } catch (err) {
-      console.error('Exception while fetching favorites:', err);
-    }
-  };
-
-  const fetchPitchRatings = async (pitchIds: string[]) => {
-    try {
-      const { data, error } = await supabase
-        .from('reviews')
-        .select('pitch_id, rating')
-        .in('pitch_id', pitchIds);
-
-      if (error) {
-        // Ignore PGRST116 (no rows) error - table exists but empty
-        if (error.code !== 'PGRST116') {
-          console.error('Error fetching ratings:', error);
-        }
-        return;
-      }
-
-      // Calculate average ratings per pitch
-      const ratingsMap = new Map<string, number>();
-      const countsMap = new Map<string, number>();
-
-      data?.forEach((review: any) => {
-        const currentSum = ratingsMap.get(review.pitch_id) || 0;
-        const currentCount = countsMap.get(review.pitch_id) || 0;
-        ratingsMap.set(review.pitch_id, currentSum + review.rating);
-        countsMap.set(review.pitch_id, currentCount + 1);
-      });
-
-      // Calculate averages
-      const averages = new Map<string, number>();
-      ratingsMap.forEach((sum, pitchId) => {
-        const count = countsMap.get(pitchId) || 1;
-        averages.set(pitchId, sum / count);
-      });
-
-      setPitchRatings(averages);
-    } catch (err) {
-      console.error('Exception while fetching ratings:', err);
-    }
+    // Mock favorites
+    setFavorites(new Set(['1']));
   };
 
   const handleFavoriteToggle = async (pitchId: string) => {
@@ -193,38 +168,8 @@ export default function Home() {
     }
     setFavorites(newFavorites);
 
-    try {
-      if (isFavorited) {
-        // Remove favorite
-        const { error } = await supabase
-          .from('favorites')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('pitch_id', pitchId);
-
-        if (error) throw error;
-      } else {
-        // Add favorite
-        const { error } = await supabase
-          .from('favorites')
-          .insert({ 
-            user_id: user.id, 
-            pitch_id: pitchId 
-          });
-
-        if (error) throw error;
-      }
-    } catch (err: any) {
-      console.error('Error toggling favorite:', err);
-      // Revert on error
-      setFavorites(favorites);
-      
-      // Show user-friendly error message
-      if (err.code === 'PGRST204' || err.code === '23505') {
-        // Duplicate or already exists - just refresh
-        fetchFavorites();
-      }
-    }
+    // Mock API call
+    console.log('Favorite toggle:', pitchId, isFavorited ? 'remove' : 'add');
   };
 
   const applyFilters = () => {
@@ -269,7 +214,7 @@ export default function Home() {
 
   const getUserName = () => {
     if (!user) return 'Mehmon';
-    return user.user_metadata?.full_name || user.email?.split('@')[0] || 'Foydalanuvchi';
+    return user.fullName || user.login || 'Foydalanuvchi';
   };
 
   return (
@@ -297,9 +242,6 @@ export default function Home() {
           {/* Quick Filters */}
           <QuickFilters activeFilter={activeFilter} onFilterChange={setActiveFilter} />
         </div>
-
-        {/* Setup Banner */}
-        {!isSupabaseConfigured && <SetupBanner />}
 
         {/* Statistics Bar - Social Proof */}
         <div className="px-4 py-6 border-b border-slate-800">
@@ -347,43 +289,43 @@ export default function Home() {
 
         {/* Pitches List */}
         <div className="px-4 py-4">
-            {loading ? (
-              <div className="grid grid-cols-2 gap-3">
-                {[...Array(6)].map((_, i) => (
-                  <PitchCardSkeleton key={i} />
-                ))}
-              </div>
-            ) : filteredPitches.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <div className="text-slate-400 mb-2">Maydonlar topilmadi</div>
-                {(searchQuery || activeFilter) && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      setActiveFilter(null);
-                    }}
-                    className="text-blue-500 text-sm hover:underline"
-                  >
-                    Filtrlarni tozalash
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {filteredPitches.map((pitch) => (
-                  <EnhancedPitchCard
-                    key={pitch.id}
-                    pitch={pitch}
-                    isFavorite={favorites.has(pitch.id)}
-                    onFavoriteToggle={handleFavoriteToggle}
-                    distance={pitchDistances.get(pitch.id)}
-                    rating={pitchRatings.get(pitch.id)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-2 gap-3">
+              {[...Array(6)].map((_, i) => (
+                <PitchCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : filteredPitches.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="text-slate-400 mb-2">Maydonlar topilmadi</div>
+              {(searchQuery || activeFilter) && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setActiveFilter(null);
+                  }}
+                  className="text-blue-500 text-sm hover:underline"
+                >
+                  Filtrlarni tozalash
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {filteredPitches.map((pitch) => (
+                <EnhancedPitchCard
+                  key={pitch.id}
+                  pitch={pitch}
+                  isFavorite={favorites.has(pitch.id)}
+                  onFavoriteToggle={handleFavoriteToggle}
+                  distance={pitchDistances.get(pitch.id)}
+                  rating={pitchRatings.get(pitch.id)}
+                />
+              ))}
+            </div>
+          )}
         </div>
+      </div>
 
       <BottomNav />
     </div>

@@ -1,8 +1,25 @@
 import { useState } from 'react';
 import { MapPin, Heart, Star } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { Pitch } from '../lib/supabase';
 import PitchCardSlider from './PitchCardSlider';
+
+// Types
+interface Pitch {
+  id: string;
+  name: string;
+  price_per_hour: number;
+  location: string;
+  landmark?: string;
+  start_time: string;
+  end_time: string;
+  latitude?: number;
+  longitude?: number;
+  images: string[];
+  amenities?: string[];
+  is_active: boolean;
+  owner_id?: string;
+  created_at?: string;
+}
 
 interface EnhancedPitchCardProps {
   pitch: Pitch;
