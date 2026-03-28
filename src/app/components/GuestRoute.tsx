@@ -2,29 +2,29 @@ import { useEffect } from 'react';
 import { useNavigate, Outlet } from 'react-router';
 import { useAuth } from '../lib/AuthContext';
 
-interface ProtectedRouteProps {
+interface GuestRouteProps {
   children?: React.ReactNode;
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+export default function GuestRoute({ children }: GuestRouteProps) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/login');
+    if (!loading && user) {
+      navigate('/');
     }
   }, [user, loading, navigate]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-slate-400">Loading...</div>
+        <div className="text-slate-400">Yuklanmoqda...</div>
       </div>
     );
   }
 
-  if (!user) {
+  if (user) {
     return null;
   }
 

@@ -4,27 +4,33 @@ import { useNavigate } from 'react-router';
 import PitchCardSlider from './PitchCardSlider';
 
 // Types
-interface Pitch {
+interface Field {
   id: string;
+  userId: string;
   name: string;
-  price_per_hour: number;
-  location: string;
-  landmark?: string;
-  start_time: string;
-  end_time: string;
-  latitude?: number;
-  longitude?: number;
+  address: string;
+  city: string;
+  lat: number | null;
+  lng: number | null;
+  pricePerHour: number;
+  size: string;
+  surface: string;
+  description: string;
+  amenities: string[];
   images: string[];
-  amenities?: string[];
-  is_active: boolean;
-  owner_id?: string;
-  created_at?: string;
+  openTime: string;
+  closeTime: string;
+  phone: string;
+  isActive: boolean;
+  rating: number;
+  reviewCount: number;
+  createdAt: string;
 }
 
 interface EnhancedPitchCardProps {
-  pitch: Pitch;
+  pitch: Field;
   isFavorite: boolean;
-  onFavoriteToggle: (pitchId: string) => void;
+  onFavoriteToggle: (fieldId: string) => void;
   distance?: number;
   rating?: number;
 }
@@ -51,21 +57,21 @@ export default function EnhancedPitchCard({
       onClick={() => navigate(`/pitch/${pitch.id}`)}
       className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 cursor-pointer hover:border-blue-500 transition-all hover:scale-[1.02]"
     >
-      {/* Pitch Image Slider with Favorite Button */}
+      {/* Field Image Slider with Favorite Button */}
       <div className="aspect-square bg-slate-800 relative overflow-hidden">
         <PitchCardSlider images={pitch.images} alt={pitch.name} />
-        
+
         {/* Favorite Button */}
         <button
           onClick={handleFavoriteClick}
           className={`absolute top-2 right-2 p-2 rounded-full backdrop-blur-sm transition-all z-10 ${
-            isFavorite 
-              ? 'bg-red-500/90 text-white' 
+            isFavorite
+              ? 'bg-red-500/90 text-white'
               : 'bg-black/40 text-white hover:bg-black/60'
           } ${isAnimating ? 'scale-125' : 'scale-100'}`}
         >
-          <Heart 
-            className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} 
+          <Heart
+            className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`}
           />
         </button>
 
@@ -85,16 +91,16 @@ export default function EnhancedPitchCard({
         )}
       </div>
 
-      {/* Pitch Info */}
+      {/* Field Info */}
       <div className="p-3">
         <h3 className="text-sm font-semibold text-white mb-1 line-clamp-1">{pitch.name}</h3>
         <div className="flex items-start text-slate-400 text-xs mb-2">
           <MapPin className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" />
-          <span className="line-clamp-1">{pitch.location}</span>
+          <span className="line-clamp-1">{pitch.address}, {pitch.city}</span>
         </div>
         <div className="flex flex-col gap-1">
           <div className="text-lg font-bold text-blue-500">
-            {(pitch.price_per_hour / 1000).toFixed(0)}k
+            {(pitch.pricePerHour / 1000).toFixed(0)}k
           </div>
           <button className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
             Batafsil

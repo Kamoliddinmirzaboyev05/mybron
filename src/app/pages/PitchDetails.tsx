@@ -2,16 +2,23 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useAuth } from '../lib/AuthContext';
 import { toDateString, filterPastSlots } from '../lib/dateUtils';
-import { ArrowLeft, MapPin, Droplets, Car, Wifi, Coffee, Moon, Users, Shield, Zap, Clock, Calendar as CalendarIcon, Share2 } from 'lucide-react';
+import { formatPhoneNumber } from '../lib/phoneFormatter';
+import { 
+  ArrowLeft, MapPin, Droplets, Car, Wifi, Coffee, Moon, 
+  Users, Shield, Zap, Clock, Calendar as CalendarIcon, 
+  Share2, Phone, MessageCircle, ExternalLink
+} from 'lucide-react';
 import PitchImageSlider from '../components/PitchImageSlider';
 import BookingModal from '../components/BookingModal';
 import ReviewsSection from '../components/ReviewsSection';
 import PitchDetailsSkeleton from '../components/PitchDetailsSkeleton';
+import { api } from '../lib/api';
+import { toast } from 'sonner';
 
 // Amenity icon mapping
 const getAmenityIcon = (amenity: string) => {
   const lowerAmenity = amenity.toLowerCase();
-  
+
   if (lowerAmenity.includes('dush') || lowerAmenity.includes('душ')) {
     return <Droplets className="w-4 h-4 text-blue-500" />;
   }
@@ -36,149 +43,65 @@ const getAmenityIcon = (amenity: string) => {
   return <Zap className="w-4 h-4 text-blue-500" />;
 };
 
+interface Field {
+  id: string;
+  userId: string;
+  name: string;
+  address: string;
+  city: string;
+  lat: number | null;
+  lng: number | null;
+  pricePerHour: number;
+  size: string;
+  surface: string;
+  description: string;
+  amenities: string[];
+  images: string[];
+  openTime: string;
+  closeTime: string;
+  phone: string;
+  isActive: boolean;
+  rating: number;
+  reviewCount: number;
+  createdAt: string;
+}
+
 export default function PitchDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [pitch, setPitch] = useState<Pitch | null>(null);
+  const [field, setField] = useState<Field | null>(null);
   const [loading, setLoading] = useState(true);
-  const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set());
   const [showSuccess, setShowSuccess] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [selectedDateForBooking, setSelectedDateForBooking] = useState<string>('');
+  const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (id) {
-      fetchPitch();
+      fetchField();
     }
   }, [id]);
 
-  useEffect(() => {
-    if (id && showBookingModal && selectedDateForBooking) {
-      fetchBookedSlots();
-    }
-  }, [id, showBookingModal, selectedDateForBooking]);
-
-  const fetchPitch = async () => {
+  const fetchField = async () => {
+    if (!id) return;
     try {
-      const { data, error } = await supabase
-        .from('pitches')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching pitch:', error);
-      } else {
-        setPitch(data);
-      }
+      const response = await api.getFieldById(id);
+      setField(response);
     } catch (err) {
-      console.error('Exception while fetching pitch:', err);
+      console.error('Exception while fetching field:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchBookedSlots = async () => {
-    if (!id || !selectedDateForBooking) return;
-
+  const fetchBookedSlots = async (dateStr: string) => {
+    if (!id) return;
     try {
-      // NEW APPROACH: Fetch from pitch_slots table
-      // Get all slots for this pitch and date where is_available = false
-      const { data, error } = await supabase
-        .from('pitch_slots')
-        .select('slot_time, is_available')
-        .eq('pitch_id', id)
-        .eq('slot_date', selectedDateForBooking)
-        .eq('is_available', false)
-        .order('slot_time', { ascending: true });
-
-      if (error) {
-        console.error('❌ XATOLIK:', error);
-        toast.error('Xatolik yuz berdi', {
-          description: 'Bandlik ma\'lumotlarini yuklab bo\'lmadi.'
-        });
-      } else {
-        console.log('\n╔═══════════════════════════════════════════════════════════════════╗');
-        console.log('║  🔍 PITCHDETAILS - BAND VAQTLARNI OLISH (pitch_slots)           ║');
-        console.log('╚═══════════════════════════════════════════════════════════════════╝');
-        
-        console.log('\n📥 DATABASE QUERY PARAMETRLARI:');
-        console.log('   ├─ Jadval: pitch_slots');
-        console.log('   ├─ pitch_id:', id);
-        console.log('   ├─ slot_date:', selectedDateForBooking);
-        console.log('   └─ is_available: false (faqat band slotlar)');
-        
-        console.log('\n📊 DATABASE DAN KELGAN MA\'LUMOT:');
-        console.log('   └─ Topilgan band slotlar soni:', data?.length || 0);
-        
-        if (data && data.length > 0) {
-          console.log('\n📋 PITCH_SLOTS JADVALIDAGI BAND SLOTLAR:');
-          console.log('   ┌─────────────────────────────────────────────────────────┐');
-          data.forEach((slot, index) => {
-            console.log(`   │ Slot #${index + 1}:`);
-            console.log('   │  ├─ slot_time:', slot.slot_time);
-            console.log('   │  └─ is_available:', slot.is_available);
-            if (index < data.length - 1) {
-              console.log('   │');
-            }
-          });
-          console.log('   └─────────────────────────────────────────────────────────┘');
-        } else {
-          console.log('\n   ℹ️  Hech qanday band slot topilmadi (barcha vaqtlar bo\'sh)');
-        }
-        
-        const slots = new Set<string>();
-        
-        console.log('\n🔄 SLOTLARNI QAYTA ISHLASH:');
-        
-        data?.forEach((item: any, index: number) => {
-          console.log(`\n   ┌─ Slot #${index + 1} ni qayta ishlash:`);
-          
-          // Normalize time by stripping seconds (HH:mm format)
-          const slotTime = item.slot_time.substring(0, 5); // "HH:mm"
-          
-          console.log('   │  ├─ Original (database):', item.slot_time);
-          console.log('   │  └─ Normalized (HH:mm):', slotTime);
-          
-          // Convert to hour slot format (e.g., "14:00 - 15:00")
-          const [hour] = slotTime.split(':').map(Number);
-          const timeSlot = `${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00`;
-          
-          console.log('   │  └─ Slot format:', timeSlot);
-          
-          slots.add(timeSlot);
-        });
-        
-        setBookedSlots(slots);
-        
-        console.log('\n╔═══════════════════════════════════════════════════════════════════╗');
-        console.log('║  📊 YAKUNIY NATIJA (bookedSlots Set ga saqlandi)                ║');
-        console.log('╚═══════════════════════════════════════════════════════════════════╝');
-        console.log('\n🔒 Band slotlar (Set):');
-        if (slots.size > 0) {
-          Array.from(slots).forEach((slot, index) => {
-            console.log(`   ${index + 1}. ${slot}`);
-          });
-        } else {
-          console.log('   (bo\'sh - hech qanday slot band emas)');
-        }
-        console.log('\n📈 Statistika:');
-        console.log('   ├─ Jami band slotlar:', slots.size, 'ta');
-        console.log('   ├─ Qayta ishlangan slotlar:', data?.length || 0, 'ta');
-        console.log('   └─ Sana:', selectedDateForBooking);
-        
-        console.log('\n💾 KEYINGI QADAM:');
-        console.log('   └─ Bu Set BookingModal → TimeSlotPicker ga props orqali uzatiladi');
-        
-        console.log('\n═══════════════════════════════════════════════════════════════════\n');
-      }
+      const slots = await api.getBookedSlots(id, dateStr);
+      setBookedSlots(new Set(slots));
     } catch (err) {
-      console.error('Exception while fetching slots:', err);
-      toast.error('Xatolik yuz berdi', {
-        description: 'Qaytadan urinib ko\'ring.'
-      });
+      console.error('Error fetching booked slots:', err);
+      setBookedSlots(new Set());
     }
   };
 
@@ -191,10 +114,34 @@ export default function PitchDetails() {
     setShowBookingModal(true);
   };
 
+  const handleBookingConfirm = async (dateStr: string, slots: string[], totalHours: number, totalPrice: number) => {
+    if (!user || !id) return;
+
+    try {
+      await api.createBooking({
+        pitchId: id,
+        userId: user.id,
+        date: dateStr,
+        timeSlots: slots,
+        totalHours,
+        totalPrice
+      });
+      
+      setShowBookingModal(false);
+      setShowSuccess(true);
+      toast.success('Muvaffaqiyatli band qilindi!');
+    } catch (err: any) {
+      toast.error('Band qilishda xatolik', {
+        description: err.message || 'Iltimos qaytadan urunib ko\'ring'
+      });
+    }
+  };
+
   const handleShare = async () => {
+    // ... same code ...
     const shareData = {
-      title: pitch?.name || 'Maydon',
-      text: `${pitch?.name} - ${pitch?.location}`,
+      title: field?.name || 'Maydon',
+      text: `${field?.name} - ${field?.address}, ${field?.city}`,
       url: window.location.href,
     };
 
@@ -218,149 +165,11 @@ export default function PitchDetails() {
     }
   };
 
-  const handleDateChange = (dateStr: string) => {
-    setSelectedDateForBooking(dateStr);
-  };
-
-  const handleBookingConfirm = async (
-    dateStr: string, 
-    slots: string[], 
-    totalHours: number, 
-    totalPrice: number
-  ) => {
-    if (!user || !pitch) return;
-
-    const loadingToast = toast.loading('Bron qilinmoqda...');
-
-    try {
-      // Fetch user profile for full_name and phone
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('full_name, phone')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error('Error fetching profile:', profileError);
-      }
-
-      // Get start and end times from selected slots
-      const slotHours = slots.map(slot => {
-        const [startStr] = slot.split(' - ');
-        return parseInt(startStr.split(':')[0]);
-      }).sort((a, b) => a - b);
-
-      const startHour = Math.min(...slotHours);
-      const endHour = Math.max(...slotHours) + 1;
-
-      // CRITICAL FIX: Double-check availability right before insert
-      // Check pitch_slots table to ensure all requested slots are available
-      const { data: existingSlots, error: checkError } = await supabase
-        .from('pitch_slots')
-        .select('slot_time, is_available')
-        .eq('pitch_id', id)
-        .eq('slot_date', dateStr)
-        .eq('is_available', false);
-
-      if (checkError) {
-        console.error('Error checking availability:', checkError);
-        toast.error('Xatolik yuz berdi', { 
-          id: loadingToast,
-          description: 'Bandlik tekshirilmadi. Qaytadan urinib ko\'ring.'
-        });
-        return;
-      }
-
-      // Check if any of our requested slots are unavailable
-      let hasConflict = false;
-      let conflictDetails = '';
-      
-      existingSlots?.forEach((slot: any) => {
-        const slotHour = parseInt(slot.slot_time.substring(0, 2));
-        
-        // Check if this unavailable slot is in our requested range
-        if (slotHour >= startHour && slotHour < endHour) {
-          hasConflict = true;
-          conflictDetails = slot.slot_time.substring(0, 5);
-        }
-      });
-
-      if (hasConflict) {
-        console.warn('Booking conflict detected (pitch_slots):', conflictDetails);
-        toast.error('Bu vaqt band!', { 
-          id: loadingToast,
-          description: 'Tanlangan vaqtda boshqa bron mavjud. Iltimos, boshqa vaqt tanlang.'
-        });
-        // Refresh booked slots to show updated availability
-        await fetchBookedSlots();
-        return;
-      }
-
-      // Format times as HH:MM:SS for time type
-      const startTimeFormatted = `${startHour.toString().padStart(2, '0')}:00:00`;
-      const endTimeFormatted = `${endHour.toString().padStart(2, '0')}:00:00`;
-
-      console.log('Creating booking:', {
-        pitch_id: id,
-        booking_date: dateStr,
-        start_time: startTimeFormatted,
-        end_time: endTimeFormatted,
-        total_hours: totalHours,
-        total_price: totalPrice
-      });
-
-      const { error } = await supabase.from('bookings').insert({
-        pitch_id: id,
-        user_id: user.id,
-        full_name: profile?.full_name || user.user_metadata?.full_name || user.email || 'User',
-        phone: profile?.phone || user.user_metadata?.phone || '',
-        booking_date: dateStr,
-        start_time: startTimeFormatted,
-        end_time: endTimeFormatted,
-        total_price: totalPrice,
-        status: 'pending',
-      });
-
-      if (error) {
-        console.error('Error creating booking:', error);
-        
-        // Check for overlap error from trigger or constraint
-        if (error.message && (error.message.includes('overlap') || error.message.includes('bron') || error.message.includes('conflict'))) {
-          toast.error('Bu vaqt band!', { 
-            id: loadingToast,
-            description: 'Tanlangan vaqtda boshqa bron mavjud.'
-          });
-          // Refresh booked slots
-          await fetchBookedSlots();
-        } else {
-          toast.error('Xatolik yuz berdi', { 
-            id: loadingToast,
-            description: 'Qaytadan urinib ko\'ring.'
-          });
-        }
-        throw error;
-      } else {
-        console.log('Booking created successfully');
-        toast.success('Muvaffaqiyatli band qilindi!', { 
-          id: loadingToast,
-          description: 'Admin tasdiqlashini kuting.'
-        });
-        setShowBookingModal(false);
-        setShowSuccess(true);
-        // Refresh booked slots to reflect the new booking
-        await fetchBookedSlots();
-      }
-    } catch (err: any) {
-      console.error('Exception while creating booking:', err);
-      // Error already handled above
-    }
-  };
-
   if (loading) {
     return <PitchDetailsSkeleton />;
   }
 
-  if (!pitch) {
+  if (!field) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-slate-400">Maydon topilmadi</div>
@@ -379,16 +188,16 @@ export default function PitchDetails() {
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          
+
           <button
             onClick={handleShare}
             className="absolute top-4 right-4 z-20 bg-black/50 backdrop-blur-sm text-white p-2 rounded-full hover:bg-black/70 transition-colors"
           >
             <Share2 className="w-6 h-6" />
           </button>
-          
-          {pitch.images && pitch.images.length > 0 ? (
-            <PitchImageSlider images={pitch.images} alt={pitch.name} />
+
+          {field.images && field.images.length > 0 ? (
+            <PitchImageSlider images={field.images} alt={field.name} />
           ) : (
             <div className="aspect-video bg-slate-800 flex items-center justify-center">
               <span className="text-slate-600">Rasm yo'q</span>
@@ -396,17 +205,18 @@ export default function PitchDetails() {
           )}
         </div>
 
-        {/* Pitch Info */}
+        {/* Field Info */}
         <div className="px-4 py-6">
-          <h1 className="text-2xl font-bold text-white mb-2">{pitch.name}</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">{field.name}</h1>
           <div className="flex items-start text-slate-400 text-sm mb-2">
             <MapPin className="w-4 h-4 mr-1 mt-0.5 flex-shrink-0" />
-            <span>{pitch.location}</span>
+            <span>{field.address}, {field.city}</span>
           </div>
-          
-          {pitch.landmark && (
-            <div className="text-slate-500 text-sm mb-3">
-              📍 {pitch.landmark}
+
+          {/* Description */}
+          {field.description && (
+            <div className="text-slate-500 text-sm mb-4">
+              {field.description}
             </div>
           )}
 
@@ -416,7 +226,7 @@ export default function PitchDetails() {
               <div>
                 <div className="text-slate-400 text-sm mb-1">Narxi</div>
                 <div className="text-3xl font-bold text-blue-500">
-                  {pitch.price_per_hour.toLocaleString()} so'm
+                  {field.pricePerHour.toLocaleString()} so'm
                 </div>
                 <div className="text-slate-500 text-sm">soatiga</div>
               </div>
@@ -424,21 +234,21 @@ export default function PitchDetails() {
                 <div className="text-slate-400 text-sm mb-1">Ish vaqti</div>
                 <div className="flex items-center gap-1 text-white">
                   <Clock className="w-4 h-4" />
-                  <span className="font-medium">{pitch.start_time?.slice(0, 5)} - {pitch.end_time?.slice(0, 5)}</span>
+                  <span className="font-medium">{field.openTime?.slice(0, 5)} - {field.closeTime?.slice(0, 5)}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Facilities/Amenities */}
-          {pitch.amenities && pitch.amenities.length > 0 && (
+          {field.amenities && field.amenities.length > 0 && (
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
                 Qulayliklar
               </h3>
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {pitch.amenities.map((amenity, index) => (
-                  <div 
+                {field.amenities.map((amenity, index) => (
+                  <div
                     key={index}
                     className="flex items-center gap-2 px-3 py-2 bg-slate-900 rounded-lg border border-slate-800 whitespace-nowrap hover:border-blue-500/50 transition-colors"
                   >
@@ -450,6 +260,87 @@ export default function PitchDetails() {
             </div>
           )}
 
+          {/* Field Details */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              Maydon haqida
+            </h3>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-slate-900 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-blue-500 mb-1">
+                  {field.size}
+                </div>
+                <div className="text-slate-400 text-xs">Hajmi</div>
+              </div>
+              <div className="bg-slate-900 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-blue-500 mb-1">
+                  {field.surface}
+                </div>
+                <div className="text-slate-400 text-xs">Yuzi</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-900 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-blue-500 mb-1">
+                  {field.rating || 0}
+                </div>
+                <div className="text-slate-400 text-xs">Rating</div>
+              </div>
+              <div className="bg-slate-900 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-blue-500 mb-1">
+                  {field.reviewCount || 0}
+                </div>
+                <div className="text-slate-400 text-xs">Sharh</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Info */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              Bog'lanish
+            </h3>
+            <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center">
+                    <Phone className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">Telefon raqam</div>
+                    <div className="text-white font-medium">{formatPhoneNumber(field.phone)}</div>
+                  </div>
+                </div>
+                <a
+                  href={`tel:${field.phone}`}
+                  className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg transition-colors"
+                >
+                  <Phone className="w-5 h-5" />
+                </a>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <a
+                  href={`https://t.me/${field.phone.replace('+', '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Telegram
+                </a>
+                <button
+                  onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${field.lat},${field.lng}`)}
+                  disabled={!field.lat || !field.lng}
+                  className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Xaritada
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Reviews Section */}
           <ReviewsSection pitchId={id || ''} />
         </div>
@@ -459,24 +350,25 @@ export default function PitchDetails() {
           <div className="max-w-md mx-auto px-4 py-4">
             <button
               onClick={handleBookingClick}
-              disabled={submitting}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-800 disabled:text-slate-500 text-white py-4 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
             >
               <CalendarIcon className="w-5 h-5" />
-              {submitting ? 'Yuklanmoqda...' : 'Band qilish'}
+              Band qilish
             </button>
           </div>
         </div>
 
         {/* Booking Modal */}
-        <BookingModal
-          isOpen={showBookingModal}
-          onClose={() => setShowBookingModal(false)}
-          pitch={pitch}
-          onConfirm={handleBookingConfirm}
-          bookedSlots={bookedSlots}
-          onDateChange={handleDateChange}
-        />
+        {field && (
+          <BookingModal
+            isOpen={showBookingModal}
+            onClose={() => setShowBookingModal(false)}
+            pitch={field}
+            onConfirm={handleBookingConfirm}
+            bookedSlots={bookedSlots}
+            onDateChange={fetchBookedSlots}
+          />
+        )}
 
         {/* Success Modal */}
         {showSuccess && (

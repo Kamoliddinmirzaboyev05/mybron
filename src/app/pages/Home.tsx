@@ -8,42 +8,49 @@ import QuickFilters from '../components/QuickFilters';
 import { useNavigate } from 'react-router';
 import { getUserLocation, calculateDistance, formatDistance, Coordinates } from '../lib/geoUtils';
 import { MapPin, Users, Star } from 'lucide-react';
+import { api } from '../lib/api';
 
 // Types
-interface Pitch {
+interface Field {
   id: string;
+  userId: string;
   name: string;
-  price_per_hour: number;
-  location: string;
-  landmark?: string;
-  start_time: string;
-  end_time: string;
-  latitude?: number;
-  longitude?: number;
+  address: string;
+  city: string;
+  lat: number | null;
+  lng: number | null;
+  pricePerHour: number;
+  size: string;
+  surface: string;
+  description: string;
+  amenities: string[];
   images: string[];
-  amenities?: string[];
-  is_active: boolean;
-  owner_id?: string;
-  created_at?: string;
+  openTime: string;
+  closeTime: string;
+  phone: string;
+  isActive: boolean;
+  rating: number;
+  reviewCount: number;
+  createdAt: string;
 }
 
 export default function Home() {
   const { user } = useAuth();
-  const [pitches, setPitches] = useState<Pitch[]>([]);
-  const [filteredPitches, setFilteredPitches] = useState<Pitch[]>([]);
+  const [fields, setFields] = useState<Field[]>([]);
+  const [filteredFields, setFilteredFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [pitchRatings, setPitchRatings] = useState<Map<string, number>>(new Map());
-  const [pitchDistances, setPitchDistances] = useState<Map<string, number>>(new Map());
+  const [fieldRatings, setFieldRatings] = useState<Map<string, number>>(new Map());
+  const [fieldDistances, setFieldDistances] = useState<Map<string, number>>(new Map());
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
   const [totalUsers, setTotalUsers] = useState(0);
   const [averageRating, setAverageRating] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchPitches();
+    fetchFields();
     fetchStatistics();
     getUserLocationData();
     if (user) {
@@ -53,7 +60,7 @@ export default function Home() {
 
   useEffect(() => {
     applyFilters();
-  }, [pitches, searchQuery, activeFilter, pitchDistances, userLocation]);
+  }, [fields, searchQuery, activeFilter, fieldDistances, userLocation]);
 
   const getUserLocationData = async () => {
     const location = await getUserLocation();
@@ -63,79 +70,41 @@ export default function Home() {
     }
   };
 
-  const fetchPitches = async () => {
+  const fetchFields = async () => {
     try {
-      // Mock data for now - replace with actual API call
-      const mockPitches: Pitch[] = [
-        {
-          id: '1',
-          name: 'Sport Arena',
-          price_per_hour: 150000,
-          location: 'Toshkent, Chilonzor',
-          landmark: 'Chilonzor metro',
-          start_time: '08:00:00',
-          end_time: '22:00:00',
-          latitude: 41.2995,
-          longitude: 69.2401,
-          images: ['/pitch1.jpg'],
-          amenities: ['Dush', 'Wi-Fi'],
-          is_active: true,
-          owner_id: 'owner1',
-          created_at: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: '2',
-          name: 'Football Field',
-          price_per_hour: 120000,
-          location: 'Toshkent, Yunusobod',
-          landmark: 'Yunusobod metro',
-          start_time: '06:00:00',
-          end_time: '24:00:00',
-          latitude: 41.3111,
-          longitude: 69.2797,
-          images: ['/pitch2.jpg'],
-          amenities: ['Dush', 'Parkovka'],
-          is_active: true,
-          owner_id: 'owner2',
-          created_at: '2024-01-01T00:00:00Z'
-        }
-      ];
-      
-      setPitches(mockPitches);
-      
+      const response = await api.getFields();
+      setFields(response);
+
       // Calculate distances if user location is available
-      if (userLocation && mockPitches) {
-        calculatePitchDistances(mockPitches, userLocation);
+      if (userLocation && response) {
+        calculateFieldDistances(response, userLocation);
       }
-      
+
       // Set mock ratings
-      setPitchRatings(new Map([
-        ['1', 4.5],
-        ['2', 4.2]
-      ]));
-      
+      setFieldRatings(new Map(response.map(field => [field.id, field.rating || 0])));
+
       // Set mock statistics
       setTotalUsers(1500);
       setAverageRating(4.3);
     } catch (err) {
-      console.error('Exception while fetching pitches:', err);
+      console.error('Exception while fetching fields:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const calculatePitchDistances = (pitchList: Pitch[], location: Coordinates) => {
+  const calculateFieldDistances = (fieldList: Field[], location: Coordinates) => {
     const distances = new Map<string, number>();
-    pitchList.forEach(pitch => {
-      if (pitch.latitude && pitch.longitude) {
+    fieldList.forEach(field => {
+      if (field.lat && field.lng) {
         const distance = calculateDistance(location, {
-          latitude: pitch.latitude,
-          longitude: pitch.longitude
+          latitude: field.lat,
+          longitude: field.lng
         });
-        distances.set(pitch.id, distance);
+        distances.set(field.id, distance);
       }
     });
-    setPitchDistances(distances);
+    setFieldDistances(distances);
   };
 
   const fetchStatistics = async () => {
@@ -146,70 +115,71 @@ export default function Home() {
 
   const fetchFavorites = async () => {
     if (!user) return;
-    
+
     // Mock favorites
     setFavorites(new Set(['1']));
   };
 
-  const handleFavoriteToggle = async (pitchId: string) => {
+  const handleFavoriteToggle = async (fieldId: string) => {
     if (!user) {
       navigate('/login');
       return;
     }
 
-    const isFavorited = favorites.has(pitchId);
+    const isFavorited = favorites.has(fieldId);
 
     // Optimistic UI update
     const newFavorites = new Set(favorites);
     if (isFavorited) {
-      newFavorites.delete(pitchId);
+      newFavorites.delete(fieldId);
     } else {
-      newFavorites.add(pitchId);
+      newFavorites.add(fieldId);
     }
     setFavorites(newFavorites);
 
     // Mock API call
-    console.log('Favorite toggle:', pitchId, isFavorited ? 'remove' : 'add');
+    console.log('Favorite toggle:', fieldId, isFavorited ? 'remove' : 'add');
   };
 
   const applyFilters = () => {
-    let filtered = [...pitches];
+    let filtered = [...fields];
 
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        pitch =>
-          pitch.name.toLowerCase().includes(query) ||
-          pitch.location.toLowerCase().includes(query)
+        field =>
+          field.name.toLowerCase().includes(query) ||
+          field.address.toLowerCase().includes(query) ||
+          field.city.toLowerCase().includes(query)
       );
     }
 
     // Quick filters
     if (activeFilter === 'cheap') {
-      filtered.sort((a, b) => a.price_per_hour - b.price_per_hour);
+      filtered.sort((a, b) => a.pricePerHour - b.pricePerHour);
     } else if (activeFilter === 'shower') {
-      filtered = filtered.filter(pitch =>
-        pitch.amenities?.some(a => a.toLowerCase().includes('dush'))
+      filtered = filtered.filter(field =>
+        field.amenities?.some(a => a.toLowerCase().includes('dush'))
       );
     } else if (activeFilter === '24/7') {
-      filtered = filtered.filter(pitch => {
-        const start = parseInt(pitch.start_time?.split(':')[0] || '0');
-        const end = parseInt(pitch.end_time?.split(':')[0] || '0');
+      filtered = filtered.filter(field => {
+        const start = parseInt(field.openTime?.split(':')[0] || '0');
+        const end = parseInt(field.closeTime?.split(':')[0] || '0');
         return start === 0 && end === 24;
       });
     } else if (activeFilter === 'nearby') {
       // Sort by distance (closest first)
-      if (userLocation && pitchDistances.size > 0) {
+      if (userLocation && fieldDistances.size > 0) {
         filtered.sort((a, b) => {
-          const distA = pitchDistances.get(a.id) || Infinity;
-          const distB = pitchDistances.get(b.id) || Infinity;
+          const distA = fieldDistances.get(a.id) || Infinity;
+          const distB = fieldDistances.get(b.id) || Infinity;
           return distA - distB;
         });
       }
     }
 
-    setFilteredPitches(filtered);
+    setFilteredFields(filtered);
   };
 
   const getUserName = () => {
@@ -246,7 +216,7 @@ export default function Home() {
         {/* Statistics Bar - Social Proof */}
         <div className="px-4 py-6 border-b border-slate-800">
           <div className="grid grid-cols-3 gap-4">
-            {/* Total Pitches */}
+            {/* Total Fields */}
             <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-xl p-4 text-center">
               <div className="flex items-center justify-center mb-2">
                 <div className="p-2 bg-blue-500/20 rounded-lg">
@@ -254,7 +224,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="text-2xl font-bold text-white mb-1">
-                {pitches.length}+
+                {fields.length}+
               </div>
               <div className="text-xs text-slate-400">Maydonlar</div>
             </div>
@@ -287,7 +257,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Pitches List */}
+        {/* Fields List */}
         <div className="px-4 py-4">
           {loading ? (
             <div className="grid grid-cols-2 gap-3">
@@ -295,7 +265,7 @@ export default function Home() {
                 <PitchCardSkeleton key={i} />
               ))}
             </div>
-          ) : filteredPitches.length === 0 ? (
+          ) : filteredFields.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20">
               <div className="text-slate-400 mb-2">Maydonlar topilmadi</div>
               {(searchQuery || activeFilter) && (
@@ -312,14 +282,14 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              {filteredPitches.map((pitch) => (
+              {filteredFields.map((field) => (
                 <EnhancedPitchCard
-                  key={pitch.id}
-                  pitch={pitch}
-                  isFavorite={favorites.has(pitch.id)}
+                  key={field.id}
+                  pitch={field}
+                  isFavorite={favorites.has(field.id)}
                   onFavoriteToggle={handleFavoriteToggle}
-                  distance={pitchDistances.get(pitch.id)}
-                  rating={pitchRatings.get(pitch.id)}
+                  distance={fieldDistances.get(field.id)}
+                  rating={fieldRatings.get(field.id)}
                 />
               ))}
             </div>

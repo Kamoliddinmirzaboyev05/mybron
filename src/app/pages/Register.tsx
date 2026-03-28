@@ -1,30 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { api } from '../lib/api';
+import { useAuth } from '../lib/AuthContext';
 import { Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function Register() {
   const navigate = useNavigate();
+  const { signUp } = useAuth();
   const [fullName, setFullName] = useState('');
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-
-  // Check if user is already logged in
-  useEffect(() => {
-    const token = api.getToken();
-    if (token) {
-      api.getProfile()
-        .then(profile => {
-          navigate('/');
-        })
-        .catch(() => {
-          api.clearToken();
-        });
-    }
-  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +25,12 @@ export default function Register() {
     }
 
     try {
-      const response = await api.register({ fullName, login, password, role: 'user' });
-      api.setToken(response.token);
+      const result = await signUp(fullName, login, password);
+      
+      if (result.error) {
+        throw result.error;
+      }
+      
       setSuccess(true);
       setLoading(false);
     } catch (error: any) {

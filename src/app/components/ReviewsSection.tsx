@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Star, User } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
+import { api, Review } from '../lib/api';
+import { toast } from 'sonner';
 
 interface ReviewsSectionProps {
   pitchId: string;
@@ -21,25 +23,8 @@ export default function ReviewsSection({ pitchId }: ReviewsSectionProps) {
 
   const fetchReviews = async () => {
     try {
-      const { data, error } = await supabase
-        .from('reviews')
-        .select(`
-          *,
-          profiles (
-            full_name
-          )
-        `)
-        .eq('pitch_id', pitchId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        // Ignore PGRST116 (no rows) error - table exists but empty
-        if (error.code !== 'PGRST116') {
-          console.error('Error fetching reviews:', error);
-        }
-      } else {
-        setReviews(data || []);
-      }
+      const data = await api.getReviews(pitchId);
+      setReviews(data || []);
     } catch (err) {
       console.error('Exception while fetching reviews:', err);
     } finally {
@@ -52,24 +37,22 @@ export default function ReviewsSection({ pitchId }: ReviewsSectionProps) {
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('reviews').insert({
-        pitch_id: pitchId,
-        user_id: user.id,
+      await api.submitReview({
+        fieldId: pitchId,
         rating,
         comment: comment.trim(),
       });
 
-      if (error) {
-        console.error('Error submitting review:', error);
-        alert('Sharh qo\'shishda xatolik yuz berdi');
-      } else {
-        setComment('');
-        setRating(5);
-        setShowAddReview(false);
-        fetchReviews();
-      }
-    } catch (err) {
+      toast.success('Sharh muvaffaqiyatli qo\'shildi!');
+      setComment('');
+      setRating(5);
+      setShowAddReview(false);
+      fetchReviews();
+    } catch (err: any) {
       console.error('Exception while submitting review:', err);
+      toast.error('Sharh qo\'shishda xatolik yuz berdi', {
+        description: err.message
+      });
     } finally {
       setSubmitting(false);
     }
@@ -182,7 +165,7 @@ export default function ReviewsSection({ pitchId }: ReviewsSectionProps) {
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-white font-medium">
-                      {review.profiles?.full_name || 'Foydalanuvchi'}
+                      {review.user?.fullName || 'Foydalanuvchi'}
                     </span>
                     <div className="flex items-center gap-1">
                       <Star className="w-4 h-4 text-yellow-400 fill-current" />
@@ -195,7 +178,7 @@ export default function ReviewsSection({ pitchId }: ReviewsSectionProps) {
                   )}
                   
                   <span className="text-slate-500 text-xs">
-                    {new Date(review.created_at || '').toLocaleDateString('uz-UZ', {
+                    {new Date(review.createdAt || '').toLocaleDateString('uz-UZ', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',

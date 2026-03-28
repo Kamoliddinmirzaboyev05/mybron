@@ -66,7 +66,7 @@ export interface Booking {
 
 export interface Review {
   id: string;
-  pitchId: string;
+  fieldId: string;
   userId: string;
   rating: number;
   comment: string;
@@ -100,9 +100,9 @@ class ApiClient {
 
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     // Add authorization header if token exists
@@ -226,13 +226,16 @@ class ApiClient {
   }
 
   // Review methods
-  async getReviews(pitchId: string): Promise<Review[]> {
-    return this.request<Review[]>(`/reviews/pitch/${pitchId}`);
+  async getReviews(fieldId: string): Promise<Review[]> {
+    return this.request<Review[]>(`/reviews/field/${fieldId}`);
+  }
+
+  async getMyReviews(): Promise<Review[]> {
+    return this.request<Review[]>('/reviews/my');
   }
 
   async submitReview(reviewData: {
-    pitchId: string;
-    userId: string;
+    fieldId: string;
     rating: number;
     comment: string;
   }): Promise<Review> {

@@ -3,14 +3,15 @@ import { useNavigate } from 'react-router';
 import BottomNav from '../components/BottomNav';
 import ProfileSkeleton from '../components/ProfileSkeleton';
 import { useAuth } from '../lib/AuthContext';
-import { User, Phone, Mail, Moon, Sun, LogOut, ChevronRight } from 'lucide-react';
+import { api, User } from '../lib/api';
+import { Phone, Mail, Moon, Sun, LogOut, ChevronRight, User as UserIcon, MessageSquare } from 'lucide-react';
 import { formatPhoneNumber } from '../lib/phoneFormatter';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, signOut, loading: authLoading } = useAuth();
+  const { user: authUser, signOut, loading: authLoading } = useAuth();
   const [darkMode, setDarkMode] = useState(true);
-  const [profile, setProfile] = useState<ProfileType | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,37 +20,28 @@ export default function Profile() {
       return;
     }
 
-    if (user) {
+    if (authUser) {
       fetchProfile();
     } else {
       navigate('/login');
     }
-  }, [user, navigate, authLoading]);
+  }, [authUser, navigate, authLoading]);
 
   const fetchProfile = async () => {
-    if (!user) return;
-
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-      } else {
-        setProfile(data);
-      }
+      const profile = await api.getProfile();
+      setUser(profile);
     } catch (err) {
       console.error('Exception while fetching profile:', err);
+      // Fallback to authUser if profile fetch fails
+      setUser(authUser);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSignOut = async () => {
-    if (confirm('Are you sure you want to sign out?')) {
+    if (confirm('Chiqishga ishonchingiz komilmi?')) {
       await signOut();
       navigate('/login');
     }
@@ -59,48 +51,45 @@ export default function Profile() {
     return <ProfileSkeleton />;
   }
 
-  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
-  const displayEmail = user?.email || '';
-  const displayPhone = profile?.phone 
-    ? (profile.phone.startsWith('+998') ? formatPhoneNumber(profile.phone) : profile.phone)
+  const displayName = user?.fullName || 'Foydalanuvchi';
+  const displayLogin = user?.login || '';
+  const displayPhone = user?.phone 
+    ? (user.phone.startsWith('+998') ? formatPhoneNumber(user.phone) : user.phone)
     : 'Kiritilmagan';
-  const memberSince = profile?.created_at 
-    ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    : 'Recently';
 
   return (
     <div className="min-h-screen bg-slate-950 pb-20 opacity-0 animate-fadeIn">
       <div className="max-w-md mx-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-slate-950 z-10 px-4 py-6 border-b border-slate-800">
-          <h1 className="text-2xl font-bold text-white">Profile</h1>
-          <p className="text-slate-400 text-sm mt-1">Manage your account settings</p>
+        <div className="sticky top-0 bg-slate-950/80 backdrop-blur-md z-10 px-4 py-6 border-b border-slate-800">
+          <h1 className="text-2xl font-bold text-white">Profil</h1>
+          <p className="text-slate-400 text-sm mt-1">Hisobingiz sozlamalarini boshqaring</p>
         </div>
 
         {/* Profile Section */}
         <div className="px-4 py-6">
           {/* Avatar and Name */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-4 p-4">
+            <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-4 p-4 border border-slate-800">
               <img src="/bronlogo.png" alt="Bron Logo" className="w-full h-full object-contain" />
             </div>
             <h2 className="text-xl font-bold text-white mb-1">{displayName}</h2>
-            <p className="text-slate-400 text-sm">Member since {memberSince}</p>
+            <p className="text-slate-400 text-sm">@{displayLogin}</p>
           </div>
 
           {/* Account Info */}
           <div className="bg-slate-900 rounded-xl border border-slate-800 mb-6 overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-800">
               <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-                Account Information
+                Hisob ma'lumotlari
               </h3>
             </div>
             <div className="divide-y divide-slate-800">
               <div className="px-4 py-4 flex items-center">
                 <Mail className="w-5 h-5 text-slate-400 mr-3" />
                 <div className="flex-1">
-                  <div className="text-xs text-slate-500 mb-1">Email</div>
-                  <div className="text-white">{displayEmail}</div>
+                  <div className="text-xs text-slate-500 mb-1">Login</div>
+                  <div className="text-white">{displayLogin}</div>
                 </div>
               </div>
               <div className="px-4 py-4 flex items-center">
@@ -110,13 +99,25 @@ export default function Profile() {
                   <div className="text-white">{displayPhone}</div>
                 </div>
               </div>
-              {profile?.role === 'admin' && (
+              
+              <button
+                onClick={() => navigate('/my-reviews')}
+                className="w-full px-4 py-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors"
+              >
+                <div className="flex items-center">
+                  <MessageSquare className="w-5 h-5 text-slate-400 mr-3" />
+                  <div className="text-white">Mening sharhlarim</div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-slate-400" />
+              </button>
+
+              {user?.role === 'admin' && (
                 <button
                   onClick={() => navigate('/admin')}
                   className="w-full px-4 py-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors border-t border-blue-500/30 bg-blue-500/10"
                 >
                   <div className="flex items-center gap-3">
-                    <User className="w-5 h-5 text-blue-400" />
+                    <UserIcon className="w-5 h-5 text-blue-400" />
                     <div className="text-left">
                       <div className="text-white font-medium">Admin Dashboard</div>
                       <div className="text-xs text-blue-400">Boshqaruv paneli</div>
@@ -132,7 +133,7 @@ export default function Profile() {
           <div className="bg-slate-900 rounded-xl border border-slate-800 mb-6 overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-800">
               <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-                Preferences
+                Sozlamalar
               </h3>
             </div>
             <div className="divide-y divide-slate-800">
@@ -144,9 +145,9 @@ export default function Profile() {
                     <Sun className="w-5 h-5 text-slate-400 mr-3" />
                   )}
                   <div>
-                    <div className="text-white">Dark Mode</div>
+                    <div className="text-white">Tungi rejim</div>
                     <div className="text-xs text-slate-500 mt-1">
-                      {darkMode ? 'Enabled' : 'Disabled'}
+                      {darkMode ? 'Yoqilgan' : 'O\'chirilgan'}
                     </div>
                   </div>
                 </div>
@@ -165,17 +166,9 @@ export default function Profile() {
               </div>
               
               <button className="w-full px-4 py-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors">
-                <div className="text-white">Language</div>
+                <div className="text-white">Til</div>
                 <div className="flex items-center text-slate-400">
-                  <span className="mr-2">English</span>
-                  <ChevronRight className="w-5 h-5" />
-                </div>
-              </button>
-              
-              <button className="w-full px-4 py-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors">
-                <div className="text-white">Notifications</div>
-                <div className="flex items-center text-slate-400">
-                  <span className="mr-2">All</span>
+                  <span className="mr-2">O'zbekcha</span>
                   <ChevronRight className="w-5 h-5" />
                 </div>
               </button>
@@ -186,20 +179,20 @@ export default function Profile() {
           <div className="bg-slate-900 rounded-xl border border-slate-800 mb-6 overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-800">
               <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-                Help & Support
+                Yordam va qo'llab-quvvatlash
               </h3>
             </div>
             <div className="divide-y divide-slate-800">
               <button className="w-full px-4 py-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors">
-                <div className="text-white">Help Center</div>
+                <div className="text-white">Yordam markazi</div>
                 <ChevronRight className="w-5 h-5 text-slate-400" />
               </button>
               <button className="w-full px-4 py-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors">
-                <div className="text-white">Terms of Service</div>
+                <div className="text-white">Foydalanish shartlari</div>
                 <ChevronRight className="w-5 h-5 text-slate-400" />
               </button>
               <button className="w-full px-4 py-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors">
-                <div className="text-white">Privacy Policy</div>
+                <div className="text-white">Maxfiylik siyosati</div>
                 <ChevronRight className="w-5 h-5 text-slate-400" />
               </button>
             </div>
@@ -211,12 +204,12 @@ export default function Profile() {
             className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 py-4 rounded-xl font-semibold transition-colors border border-red-500/30 flex items-center justify-center gap-2"
           >
             <LogOut className="w-5 h-5" />
-            Sign Out
+            Chiqish
           </button>
 
           {/* Version */}
           <div className="text-center text-slate-600 text-xs mt-6">
-            Version 1.0.0
+            Versiya 1.0.0
           </div>
         </div>
       </div>

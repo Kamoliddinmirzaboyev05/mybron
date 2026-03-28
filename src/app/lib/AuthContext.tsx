@@ -18,13 +18,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Check if user is already logged in
     const token = api.getToken();
-    const storedUser = api.getUser();
     
-    if (token && storedUser) {
-      // Verify token is still valid
+    if (token) {
+      // Always try to get the latest profile if we have a token
       api.getProfile()
         .then(profile => {
           setUser(profile);
+          api.setUser(profile); // Update stored user just in case
           setLoading(false);
         })
         .catch(() => {

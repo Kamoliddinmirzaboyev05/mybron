@@ -1,30 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { api } from '../lib/api';
+import { useAuth } from '../lib/AuthContext';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [user, setUser] = useState(null);
-
-  // Check if user is already logged in
-  useEffect(() => {
-    const token = api.getToken();
-    if (token) {
-      api.getProfile()
-        .then(profile => {
-          setUser(profile);
-          navigate('/');
-        })
-        .catch(() => {
-          api.clearToken();
-        });
-    }
-  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,9 +17,11 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await api.login({ login, password });
-      api.setToken(response.token);
-      setUser(response.user);
+      const result = await signIn(login, password);
+      
+      if (result.error) {
+        throw result.error;
+      }
       
       // Check if user was trying to book a pitch
       const returnToPitch = sessionStorage.getItem('returnToPitch');
