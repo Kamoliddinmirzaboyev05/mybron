@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router';
 import { getUserLocation, calculateDistance, formatDistance, Coordinates } from '../lib/geoUtils';
 import { MapPin, Users, Star } from 'lucide-react';
 import { api } from '../lib/api';
+import { toast } from 'sonner';
 
 // Types
 interface Field {
@@ -116,8 +117,13 @@ export default function Home() {
   const fetchFavorites = async () => {
     if (!user) return;
 
-    // Mock favorites
-    setFavorites(new Set(['1']));
+    try {
+      const response = await api.getFavorites();
+      const favoriteIds = new Set(response.map(f => f.fieldId));
+      setFavorites(favoriteIds);
+    } catch (err) {
+      console.error('Exception while fetching favorites:', err);
+    }
   };
 
   const handleFavoriteToggle = async (fieldId: string) => {
@@ -137,8 +143,19 @@ export default function Home() {
     }
     setFavorites(newFavorites);
 
-    // Mock API call
-    console.log('Favorite toggle:', fieldId, isFavorited ? 'remove' : 'add');
+    try {
+      if (isFavorited) {
+        await api.removeFavorite(fieldId);
+      } else {
+        await api.addFavorite(fieldId);
+      }
+    } catch (err) {
+      console.error('Exception while toggling favorite:', err);
+      // Revert on error
+      const revertedFavorites = new Set(favorites);
+      setFavorites(revertedFavorites);
+      toast.error('Xatolik yuz berdi');
+    }
   };
 
   const applyFilters = () => {

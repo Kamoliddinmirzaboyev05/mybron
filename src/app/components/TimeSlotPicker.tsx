@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Clock, AlertCircle } from 'lucide-react';
+import { FieldSlot } from '../lib/api';
 
 interface TimeSlotPickerProps {
-  slots: string[];
-  bookedSlots: Set<string>;
+  slots: FieldSlot[];
   selectedSlots: string[];
   onSlotsChange: (slots: string[]) => void;
+  onSlotIdsChange?: (slotIds: string[]) => void;
   pricePerHour: number;
 }
 
 export default function TimeSlotPicker({ 
   slots, 
-  bookedSlots, 
   selectedSlots,
   onSlotsChange,
+  onSlotIdsChange,
   pricePerHour 
 }: TimeSlotPickerProps) {
   const [error, setError] = useState<string>('');
@@ -25,15 +26,19 @@ export default function TimeSlotPicker({
     }
   }, [selectedSlots]);
 
-  const getSlotHour = (slot: string): number => {
-    const [startStr] = slot.split(' - ');
+  const getSlotDisplay = (slot: FieldSlot): string => {
+    return `${slot.startTime} - ${slot.endTime}`;
+  };
+
+  const getSlotHour = (display: string): number => {
+    const [startStr] = display.split(' - ');
     return parseInt(startStr.split(':')[0]);
   };
 
-  const isConsecutive = (newSlot: string, currentSlots: string[]): boolean => {
+  const isConsecutive = (newSlotDisplay: string, currentSlots: string[]): boolean => {
     if (currentSlots.length === 0) return true;
 
-    const newHour = getSlotHour(newSlot);
+    const newHour = getSlotHour(newSlotDisplay);
     const selectedHours = currentSlots.map(getSlotHour).sort((a, b) => a - b);
     const minHour = Math.min(...selectedHours);
     const maxHour = Math.max(...selectedHours);
@@ -56,44 +61,61 @@ export default function TimeSlotPicker({
     return true;
   };
 
-  const handleSlotClick = (slot: string) => {
-    // No need to check isBooked since booked slots are now hidden from UI
-    const isSelected = selectedSlots.includes(slot);
+  const handleSlotClick = (slot: FieldSlot) => {
+    if (!slot.isAvailable) return;
+    
+    const slotDisplay = getSlotDisplay(slot);
+    const isSelected = selectedSlots.includes(slotDisplay);
 
     if (isSelected) {
       // Deselect - remove from selection
-      const newSlots = selectedSlots.filter(s => s !== slot);
+      const newSlots = selectedSlots.filter(s => s !== slotDisplay);
       
       // Check if remaining slots are still consecutive
       if (areAllConsecutive(newSlots)) {
         onSlotsChange(newSlots);
+        // Update slot IDs
+        if (onSlotIdsChange) {
+          const newSlotIds = slots
+            .filter(s => newSlots.includes(getSlotDisplay(s)))
+            .map(s => s.id);
+          onSlotIdsChange(newSlotIds);
+        }
         setError('');
       } else {
         setError('Faqat ketma-ket soatlarni tanlash mumkin');
       }
     } else {
       // Select - add to selection
-      const newSlots = [...selectedSlots, slot];
+      const newSlots = [...selectedSlots, slotDisplay];
       
-      if (isConsecutive(slot, selectedSlots)) {
-        // Check if any slot in the range is booked
+      if (isConsecutive(slotDisplay, selectedSlots)) {
+        // Check if any slot in the range is unavailable
         const hours = newSlots.map(getSlotHour).sort((a, b) => a - b);
         const minHour = Math.min(...hours);
         const maxHour = Math.max(...hours);
         
-        let hasBookedInRange = false;
+        let hasUnavailableInRange = false;
         for (let h = minHour; h <= maxHour; h++) {
-          const slotStr = `${h.toString().padStart(2, '0')}:00 - ${(h + 1).toString().padStart(2, '0')}:00`;
-          if (bookedSlots.has(slotStr) && !newSlots.includes(slotStr)) {
-            hasBookedInRange = true;
+          const targetDisplay = `${h.toString().padStart(2, '0')}:00 - ${(h + 1).toString().padStart(2, '0')}:00`;
+          const targetSlot = slots.find(s => getSlotDisplay(s) === targetDisplay);
+          if (targetSlot && !targetSlot.isAvailable && !newSlots.includes(targetDisplay)) {
+            hasUnavailableInRange = true;
             break;
           }
         }
         
-        if (hasBookedInRange) {
+        if (hasUnavailableInRange) {
           setError('Tanlangan oraliqda band qilingan soatlar bor');
         } else {
           onSlotsChange(newSlots);
+          // Update slot IDs
+          if (onSlotIdsChange) {
+            const newSlotIds = slots
+              .filter(s => newSlots.includes(getSlotDisplay(s)))
+              .map(s => s.id);
+            onSlotIdsChange(newSlotIds);
+          }
           setError('');
         }
       } else {
@@ -127,6 +149,9 @@ export default function TimeSlotPicker({
           <button
             onClick={() => {
               onSlotsChange([]);
+              if (onSlotIdsChange) {
+                onSlotIdsChange([]);
+              }
               setError('');
             }}
             className="text-xs text-blue-500 hover:text-blue-400"
@@ -162,89 +187,35 @@ export default function TimeSlotPicker({
 
       {/* Time Slots Grid - 2 columns */}
       <div className="grid grid-cols-2 gap-3 px-4">
-        {(() => {
-          const availableSlots = slots.filter(slot => !bookedSlots.has(slot));
+        {slots.map((slot) => {
+          const slotDisplay = getSlotDisplay(slot);
+          const isSelected = selectedSlots.includes(slotDisplay);
           
-          console.log('\n╔════════════════════════════════════════════════════════╗');
-          console.log('║  📊 TIMESLOTPICKER - VAQT SLOTLARI TAHLILI           ║');
-          console.log('╚════════════════════════════════════════════════════════╝');
-          
-          console.log('\n📥 KIRUVCHI MA\'LUMOTLAR:');
-          console.log('   ├─ slots (props dan):', slots);
-          console.log('   │  └─ Jami:', slots.length, 'ta slot');
-          console.log('   │');
-          console.log('   └─ bookedSlots (props dan):', Array.from(bookedSlots));
-          console.log('      └─ Jami:', bookedSlots.size, 'ta band slot');
-          
-          console.log('\n🔍 FILTRLASH JARAYONI:');
-          console.log('   Har bir slot uchun tekshirish: bookedSlots.has(slot)');
-          
-          // Show which slots are filtered out
-          const filteredOutSlots = slots.filter(slot => bookedSlots.has(slot));
-          if (filteredOutSlots.length > 0) {
-            console.log('\n   ❌ BAND SLOTLAR (ko\'rsatilmaydi):');
-            filteredOutSlots.forEach(slot => {
-              console.log('      ├─', slot, '← bookedSlots da mavjud');
-            });
-          }
-          
-          if (availableSlots.length > 0) {
-            console.log('\n   ✅ BO\'SH SLOTLAR (ko\'rsatiladi):');
-            availableSlots.forEach(slot => {
-              console.log('      ├─', slot, '← bookedSlots da yo\'q');
-            });
-          }
-          
-          console.log('\n📊 YAKUNIY NATIJA:');
-          console.log('   ├─ Band slotlar:', bookedSlots.size, 'ta');
-          console.log('   ├─ Bo\'sh slotlar:', availableSlots.length, 'ta');
-          console.log('   └─ Jami slotlar:', slots.length, 'ta');
-          
-          console.log('\n💡 MANBA:');
-          console.log('   ├─ slots → BookingModal.tsx dan keladi');
-          console.log('   ├─ bookedSlots → PitchDetails.tsx dan keladi');
-          console.log('   └─ bookedSlots → fetchBookedSlots() funksiyasidan to\'ldiriladi');
-          
-          console.log('\n════════════════════════════════════════════════════════\n');
-          
-          return availableSlots.map((slot) => {
-            const isSelected = selectedSlots.includes(slot);
-            
-            return (
-              <button
-                key={slot}
-                onClick={() => handleSlotClick(slot)}
-                className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
-                  isSelected
-                    ? 'bg-green-600 text-white border-2 border-green-500 shadow-lg'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-blue-500'
-                }`}
-              >
-                {slot}
-              </button>
-            );
-          });
-        })()}
+          if (!slot.isAvailable && !isSelected) return null;
+
+          return (
+            <button
+              key={slot.id}
+              onClick={() => handleSlotClick(slot)}
+              className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
+                isSelected
+                  ? 'bg-green-600 text-white border-2 border-green-500 shadow-lg'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 hover:border-blue-500'
+              }`}
+            >
+              {slotDisplay}
+            </button>
+          );
+        })}
       </div>
       
       {/* Show message if no slots available */}
-      {(() => {
-        const availableSlots = slots.filter(slot => !bookedSlots.has(slot));
-        
-        if (availableSlots.length === 0) {
-          console.warn('⚠️ DIQQAT: Barcha vaqtlar band!');
-          console.log('Jami slotlar:', slots.length);
-          console.log('Band slotlar:', bookedSlots.size);
-          
-          return (
-            <div className="px-4 py-8 text-center">
-              <div className="text-slate-400 mb-2">Barcha vaqtlar band</div>
-              <div className="text-sm text-slate-500">Iltimos, boshqa sana tanlang</div>
-            </div>
-          );
-        }
-        return null;
-      })()}
+      {slots.filter(s => s.isAvailable).length === 0 && (
+        <div className="px-4 py-8 text-center">
+          <div className="text-slate-400 mb-2">Barcha vaqtlar band</div>
+          <div className="text-sm text-slate-500">Iltimos, boshqa sana tanlang</div>
+        </div>
+      )}
 
       {/* Selected Range Summary */}
       {selectedSlots.length > 0 && (
@@ -270,7 +241,7 @@ export default function TimeSlotPicker({
         </div>
       )}
       
-      {/* Legend - Updated to reflect that booked slots are hidden */}
+      {/* Legend */}
       <div className="flex gap-4 mt-4 px-4 text-xs">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-green-600" />
@@ -281,15 +252,6 @@ export default function TimeSlotPicker({
           <span className="text-slate-400">Bo'sh</span>
         </div>
       </div>
-      
-      {/* Info message about hidden booked slots */}
-      {bookedSlots.size > 0 && (
-        <div className="mt-3 px-4">
-          <div className="text-xs text-slate-500 text-center">
-            Band qilingan vaqtlar ko'rsatilmaydi
-          </div>
-        </div>
-      )}
     </div>
   );
 }

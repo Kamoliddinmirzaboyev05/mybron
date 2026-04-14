@@ -1,40 +1,63 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../lib/AuthContext';
-import { Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, CheckCircle, Phone } from 'lucide-react';
+import { formatPhoneNumber, cleanPhoneNumber, isValidUzbekPhone } from '../lib/phoneFormatter';
 
 export default function Register() {
   const navigate = useNavigate();
   const { signUp } = useAuth();
   const [fullName, setFullName] = useState('');
   const [login, setLogin] = useState('');
+  const [phone, setPhone] = useState('+998 ');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
-      setLoading(false);
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Agar foydalanuvchi +998 ni o'chirib tashlasa, qayta tiklash
+    if (!value.startsWith('+998')) {
+      setPhone('+998 ');
       return;
     }
 
+    // Faqat raqamlarni formatlash
+    const formatted = formatPhoneNumber(value);
+    setPhone(formatted);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    const cleanedPhone = cleanPhoneNumber(phone);
+    
+    if (!isValidUzbekPhone(cleanedPhone)) {
+      setError('Telefon raqami noto\'g\'ri kiritilgan (+998 XX XXX XX XX)');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Parol kamida 6 ta belgidan iborat bo\'lishi kerak');
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const result = await signUp(fullName, login, password);
+      const result = await signUp(fullName, login, cleanedPhone, password);
       
       if (result.error) {
         throw result.error;
       }
       
       setSuccess(true);
-      setLoading(false);
     } catch (error: any) {
-      setError(error.message || 'Registration failed');
+      setError(error.message || 'Ro\'yxatdan o\'tishda xatolik yuz berdi');
+    } finally {
       setLoading(false);
     }
   };
@@ -43,15 +66,15 @@ export default function Register() {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
         <div className="max-w-md w-full text-center">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden bg-white/5 p-2">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden bg-white/5 p-2 border border-slate-800">
             <img src="/bronlogo.png" alt="Bron Logo" className="w-full h-full object-contain" />
           </div>
           <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-green-500" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-3">Registration Successful!</h1>
+          <h1 className="text-2xl font-bold text-white mb-3">Ro'yxatdan o'tdingiz!</h1>
           <p className="text-slate-400 mb-6">
-            Your account has been created successfully. You can now sign in.
+            Hisobingiz muvaffaqiyatli yaratildi. Endi tizimga kirishingiz mumkin.
           </p>
           <button
             onClick={() => {
@@ -65,7 +88,7 @@ export default function Register() {
             }}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition-colors"
           >
-            Go to Login
+            Kirish sahifasiga o'tish
           </button>
         </div>
       </div>
@@ -77,11 +100,11 @@ export default function Register() {
       <div className="max-w-md w-full">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden bg-white/5 p-2">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden bg-white/5 p-2 border border-slate-800">
             <img src="/bronlogo.png" alt="Bron Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
-          <p className="text-slate-400">Sign up to start booking pitches</p>
+          <h1 className="text-3xl font-bold text-white mb-2">Ro'yxatdan o'tish</h1>
+          <p className="text-slate-400">Maydonlarni band qilish uchun hisob yarating</p>
         </div>
 
         {/* Error Message */}
@@ -96,7 +119,7 @@ export default function Register() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Full Name
+              To'liq ism (F.I.SH)
             </label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
@@ -104,7 +127,7 @@ export default function Register() {
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="John Doe"
+                placeholder="Jasur Toshmatov"
                 required
                 className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
               />
@@ -121,7 +144,7 @@ export default function Register() {
                 type="text"
                 value={login}
                 onChange={(e) => setLogin(e.target.value)}
-                placeholder="your login"
+                placeholder="jasur"
                 required
                 className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
               />
@@ -130,7 +153,24 @@ export default function Register() {
 
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Password
+              Telefon raqami
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+              <input
+                type="tel"
+                value={phone}
+                onChange={handlePhoneChange}
+                placeholder="+998 90 123 45 67"
+                required
+                className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Parol
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
@@ -144,7 +184,7 @@ export default function Register() {
                 className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
               />
             </div>
-            <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
+            <p className="text-xs text-slate-500 mt-1">Kamida 6 ta belgi bo'lishi kerak</p>
           </div>
 
           <button
@@ -152,19 +192,19 @@ export default function Register() {
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-800 disabled:text-slate-500 text-white py-3 rounded-lg font-semibold transition-colors"
           >
-            {loading ? 'Creating account...' : 'Sign Up'}
+            {loading ? 'Yaratilmoqda...' : 'Ro\'yxatdan o\'tish'}
           </button>
         </form>
 
         {/* Login Link */}
         <div className="mt-6 text-center">
           <p className="text-slate-400">
-            Already have an account?{' '}
+            Hisobingiz bormi?{' '}
             <button
               onClick={() => navigate('/login')}
               className="text-blue-500 hover:text-blue-400 font-medium transition-colors"
             >
-              Sign In
+              Kirish
             </button>
           </p>
         </div>

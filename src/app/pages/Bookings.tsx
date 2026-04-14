@@ -5,8 +5,9 @@ import { calculateHours } from '../lib/dateUtils';
 import { toast } from 'sonner';
 import BottomNav from '../components/BottomNav';
 import BookingCardSkeleton from '../components/BookingCardSkeleton';
-import { Calendar, Clock, X } from 'lucide-react';
+import { Calendar, Clock, X, MapPin } from 'lucide-react';
 import { formatPhoneNumber } from '../lib/phoneFormatter';
+import { api, Booking } from '../lib/api';
 
 export default function Bookings() {
   const navigate = useNavigate();
@@ -27,57 +28,14 @@ export default function Bookings() {
     }
 
     fetchBookings();
-
-    // Real-time subscription - faqat shu foydalanuvchining bronlari uchun
-    const channel = supabase
-      .channel('user_bookings_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'bookings',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          console.log('Booking change detected for user:', payload);
-          fetchBookings();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [user, navigate, authLoading]);
 
   const fetchBookings = async () => {
     if (!user) return;
 
-    console.log('Fetching bookings for user:', user.id);
-
     try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          pitches (
-            name,
-            location,
-            images
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('booking_date', { ascending: false })
-        .order('start_time', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching bookings:', error);
-      } else {
-        console.log('Fetched bookings:', data);
-        console.log('Total bookings count:', data?.length || 0);
-        setBookings(data || []);
-      }
+      const data = await api.getBookings(user.id);
+      setBookings(data || []);
     } catch (err) {
       console.error('Exception while fetching bookings:', err);
     } finally {
@@ -86,7 +44,6 @@ export default function Bookings() {
   };
 
   const handleCancelBooking = async (bookingId: string) => {
-    // Use a more user-friendly confirmation approach
     const confirmCancel = window.confirm('Bronni bekor qilmoqchimisiz?');
     if (!confirmCancel) {
       return;
@@ -95,73 +52,48 @@ export default function Bookings() {
     const loadingToast = toast.loading('Bekor qilinmoqda...');
 
     try {
-      // Update status to 'cancelled'
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'cancelled' })
-        .eq('id', bookingId)
-        .eq('user_id', user?.id); // Only cancel own bookings
-
-      if (error) {
-        console.error('Error canceling booking:', error);
-        toast.error('Xatolik yuz berdi', { 
-          id: loadingToast,
-          description: 'Qaytadan urinib ko\'ring.'
-        });
-      } else {
-        toast.success('Bron bekor qilindi!', { 
-          id: loadingToast,
-          description: 'Vaqt endi boshqalar uchun ochiq.'
-        });
-        // Real-time subscription will auto-update
-        console.log('Booking cancelled successfully, status set to cancelled');
-      }
-    } catch (err) {
+      await api.cancelBooking(bookingId);
+      toast.success('Bron bekor qilindi!', { 
+        id: loadingToast,
+        description: 'Vaqt endi boshqalar uchun ochiq.'
+      });
+      fetchBookings();
+    } catch (err: any) {
       console.error('Exception while canceling booking:', err);
       toast.error('Xatolik yuz berdi', { 
         id: loadingToast,
-        description: 'Qaytadan urinib ko\'ring.'
+        description: err.message || 'Qaytadan urinib ko\'ring.'
       });
     }
   };
 
   const filterBookings = (status: string) => {
-    console.log('Filtering bookings by status:', status);
-    console.log('All bookings:', bookings);
-    
     if (status === 'history') {
-      // Tarix: rad etilgan va bekor qilingan bronlar
-      const filtered = bookings.filter(b => b.status === 'rejected' || b.status === 'cancelled');
-      console.log('History bookings:', filtered);
-      return filtered;
+      return bookings.filter(b => b.status === 'rejected' || b.status === 'cancelled');
     }
     if (status === 'confirmed') {
-      // Tasdiqlangan: confirmed va manual statusdagi bronlar
-      const filtered = bookings.filter(b => b.status === 'confirmed' || b.status === 'manual');
-      console.log('Confirmed bookings:', filtered);
-      return filtered;
+      return bookings.filter(b => b.status === 'confirmed' || b.status === 'manual');
     }
-    // Pending: kutilayotgan bronlar
-    const filtered = bookings.filter(b => b.status === status);
-    console.log('Pending bookings:', filtered);
-    return filtered;
+    return bookings.filter(b => b.status === status);
   };
 
   const formatDate = (booking: Booking) => {
-    if (!booking.booking_date) return 'N/A';
-    const date = new Date(booking.booking_date);
+    const dateStr = booking.bookingDate;
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
     const days = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
     const months = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
     return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
   };
 
-  const formatTime = (startTime: string, endTime: string) => {
-    // start_time and end_time are in HH:MM:SS format
-    if (!startTime || !endTime) return 'N/A';
-    const start = startTime.slice(0, 5); // HH:MM
-    const end = endTime.slice(0, 5); // HH:MM
-    const hours = calculateHours(startTime, endTime);
-    return `${start} - ${end} (${hours} soat)`;
+  const formatTime = (booking: Booking) => {
+    if (booking.startTime && booking.endTime) {
+      const start = booking.startTime.slice(0, 5);
+      const end = booking.endTime.slice(0, 5);
+      const hours = calculateHours(booking.startTime, booking.endTime);
+      return `${start} - ${end} (${hours} soat)`;
+    }
+    return 'N/A';
   };
 
   const getStatusColor = (status: string) => {
@@ -194,20 +126,17 @@ export default function Bookings() {
 
   return (
     <div className="min-h-screen bg-slate-950 pb-20">
-      {/* Auth loading holatini ko'rsatish */}
       {authLoading ? (
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-slate-400">Yuklanmoqda...</div>
         </div>
       ) : (
         <div className="max-w-md mx-auto">
-        {/* Header */}
         <div className="sticky top-0 bg-slate-950 z-10 px-4 py-6 border-b border-slate-800 animate-fadeInUp">
           <h1 className="text-2xl font-bold text-white">Mening bronlarim</h1>
           <p className="text-slate-400 text-sm mt-1">Maydon bandlovlaringizni kuzating</p>
         </div>
 
-        {/* Tabs */}
         <div className="sticky top-[88px] bg-slate-950 z-10 px-4 py-4 border-b border-slate-800 animate-fadeInUp" style={{ animationDelay: '0.1s' }}>
           <div className="flex gap-2">
             {[
@@ -230,7 +159,6 @@ export default function Bookings() {
           </div>
         </div>
 
-        {/* Bookings List */}
         <div className="px-4 py-4 space-y-4 animate-fadeInUp" style={{ animationDelay: '0.2s' }}>
           {loading ? (
             <>
@@ -267,45 +195,47 @@ export default function Bookings() {
                 className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800"
               >
                 <div className="p-4">
-                  {/* Pitch Name */}
                   <div className="flex items-start justify-between mb-3">
                     <h3 className="text-lg font-semibold text-white">
-                      {booking.pitches?.name || 'Unknown Pitch'}
+                      {booking.field?.name || 'Noma\'lum maydon'}
                     </h3>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(booking.status)}`}>
                       {getStatusLabel(booking.status)}
                     </span>
                   </div>
 
-                  {/* Date and Time */}
                   <div className="space-y-2 mb-4">
+                    <div className="flex items-center text-slate-400 text-sm">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      <span>{booking.field?.address}, {booking.field?.city}</span>
+                    </div>
                     <div className="flex items-center text-slate-400 text-sm">
                       <Calendar className="w-4 h-4 mr-2" />
                       <span>{formatDate(booking)}</span>
                     </div>
                     <div className="flex items-center text-slate-400 text-sm">
                       <Clock className="w-4 h-4 mr-2" />
-                      <span>{formatTime(booking.start_time, booking.end_time)}</span>
+                      <span>{formatTime(booking)}</span>
                     </div>
                   </div>
 
-                  {/* Customer Info */}
                   <div className="bg-slate-950 rounded-lg p-3 mb-3">
-                    <div className="text-xs text-slate-500 mb-1">Bron ma'lumotlari</div>
-                    <div className="text-sm text-slate-300">
-                      <div><span className="text-slate-500">Ism:</span> {booking.full_name || booking.customer_name || 'N/A'}</div>
-                      <div><span className="text-slate-500">Telefon:</span> {
-                        booking.phone || booking.customer_phone 
-                          ? formatPhoneNumber(booking.phone || booking.customer_phone || '')
-                          : 'N/A'
-                      }</div>
-                      {booking.total_price && (
-                        <div><span className="text-slate-500">Narx:</span> {booking.total_price.toLocaleString()} so'm</div>
-                      )}
+                    <div className="text-xs text-slate-500 mb-1">To'lov ma'lumotlari</div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-slate-300">
+                        <span className="text-slate-500">Usul:</span> {booking.paymentMethod === 'cash' ? 'Naqd' : (booking.paymentMethod || 'N/A')}
+                      </div>
+                      <div className="text-sm font-bold text-green-400">
+                        {booking.totalPrice.toLocaleString()} so'm
+                      </div>
                     </div>
+                    {booking.note && (
+                      <div className="mt-2 text-xs text-slate-500 italic">
+                        <span className="text-slate-600 not-italic">Izoh:</span> {booking.note}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Cancel Button (only for pending) */}
                   {booking.status === 'pending' && (
                     <button
                       onClick={() => handleCancelBooking(booking.id)}

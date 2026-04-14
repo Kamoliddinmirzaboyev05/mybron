@@ -6,7 +6,7 @@ import { formatPhoneNumber } from '../lib/phoneFormatter';
 import { 
   ArrowLeft, MapPin, Droplets, Car, Wifi, Coffee, Moon, 
   Users, Shield, Zap, Clock, Calendar as CalendarIcon, 
-  Share2, Phone, MessageCircle, ExternalLink
+  Share2, Phone, MessageCircle, ExternalLink, Heart
 } from 'lucide-react';
 import PitchImageSlider from '../components/PitchImageSlider';
 import BookingModal from '../components/BookingModal';
@@ -72,15 +72,18 @@ export default function PitchDetails() {
   const { user } = useAuth();
   const [field, setField] = useState<Field | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFavorite, setIsFavorite] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
-  const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (id) {
       fetchField();
+      if (user) {
+        checkIfFavorite();
+      }
     }
-  }, [id]);
+  }, [id, user]);
 
   const fetchField = async () => {
     if (!id) return;
@@ -94,14 +97,40 @@ export default function PitchDetails() {
     }
   };
 
-  const fetchBookedSlots = async (dateStr: string) => {
-    if (!id) return;
+  const checkIfFavorite = async () => {
+    if (!id || !user) return;
     try {
-      const slots = await api.getBookedSlots(id, dateStr);
-      setBookedSlots(new Set(slots));
+      const favorites = await api.getFavorites();
+      setIsFavorite(favorites.some(f => f.fieldId === id));
     } catch (err) {
-      console.error('Error fetching booked slots:', err);
-      setBookedSlots(new Set());
+      console.error('Error checking favorite status:', err);
+    }
+  };
+
+  const handleFavoriteToggle = async () => {
+    if (!user) {
+      sessionStorage.setItem('returnToPitch', id || '');
+      navigate('/login');
+      return;
+    }
+
+    if (!id) return;
+
+    const previousState = isFavorite;
+    setIsFavorite(!previousState);
+
+    try {
+      if (previousState) {
+        await api.removeFavorite(id);
+        toast.success('Sevimlilardan olib tashlandi');
+      } else {
+        await api.addFavorite(id);
+        toast.success('Sevimlilarga qo\'shildi');
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+      setIsFavorite(previousState);
+      toast.error('Xatolik yuz berdi');
     }
   };
 
@@ -114,17 +143,21 @@ export default function PitchDetails() {
     setShowBookingModal(true);
   };
 
-  const handleBookingConfirm = async (dateStr: string, slots: string[], totalHours: number, totalPrice: number) => {
-    if (!user || !id) return;
+  const handleBookingConfirm = async (dateStr: string, slots: string[], totalHours: number, totalPrice: number, slotIds: string[]) => {
+    if (!user || !id || slotIds.length === 0) return;
+
+    // slots are like ["18:00 - 19:00", "19:00 - 20:00"]
+    const startTime = slots[0].split(' - ')[0];
+    const endTime = slots[slots.length - 1].split(' - ')[1];
 
     try {
-      await api.createBooking({
-        pitchId: id,
-        userId: user.id,
+      // Use the first slot ID for booking (API books one slot at a time)
+      await api.bookSlot({
+        slotId: slotIds[0],
+        fieldId: id,
         date: dateStr,
-        timeSlots: slots,
-        totalHours,
-        totalPrice
+        startTime,
+        endTime
       });
       
       setShowBookingModal(false);
@@ -194,6 +227,17 @@ export default function PitchDetails() {
             className="absolute top-4 right-4 z-20 bg-black/50 backdrop-blur-sm text-white p-2 rounded-full hover:bg-black/70 transition-colors"
           >
             <Share2 className="w-6 h-6" />
+          </button>
+
+          <button
+            onClick={handleFavoriteToggle}
+            className="absolute top-4 right-16 z-20 bg-black/50 backdrop-blur-sm p-2 rounded-full hover:bg-black/70 transition-colors group"
+          >
+            <Heart 
+              className={`w-6 h-6 transition-colors ${
+                isFavorite ? 'text-red-500 fill-current' : 'text-white group-hover:text-red-400'
+              }`} 
+            />
           </button>
 
           {field.images && field.images.length > 0 ? (
@@ -365,8 +409,7 @@ export default function PitchDetails() {
             onClose={() => setShowBookingModal(false)}
             pitch={field}
             onConfirm={handleBookingConfirm}
-            bookedSlots={bookedSlots}
-            onDateChange={fetchBookedSlots}
+            onDateChange={() => {}}
           />
         )}
 

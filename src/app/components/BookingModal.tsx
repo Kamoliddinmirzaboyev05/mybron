@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { toDateString, filterPastSlots } from '../lib/dateUtils';
+import { toDateString } from '../lib/dateUtils';
 import DatePicker from './DatePicker';
 import TimeSlotPicker from './TimeSlotPicker';
-import { Pitch } from '../lib/api';
+import { Pitch, api, FieldSlot } from '../lib/api';
 
 interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   pitch: Pitch;
-  onConfirm: (dateStr: string, slots: string[], totalHours: number, totalPrice: number) => Promise<void>;
-  bookedSlots: Set<string>;
+  onConfirm: (dateStr: string, slots: string[], totalHours: number, totalPrice: number, slotIds: string[]) => Promise<void>;
   onDateChange: (dateStr: string) => void;
 }
 
@@ -19,13 +18,13 @@ export default function BookingModal({
   onClose, 
   pitch, 
   onConfirm, 
-  bookedSlots,
   onDateChange 
 }: BookingModalProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+  const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<FieldSlot[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -34,6 +33,7 @@ export default function BookingModal({
       today.setHours(0, 0, 0, 0);
       setSelectedDate(today);
       setSelectedSlots([]);
+      setSelectedSlotIds([]);
       onDateChange(toDateString(today));
     }
   }, [isOpen]);
@@ -48,48 +48,32 @@ export default function BookingModal({
     setLoading(true);
     try {
       if (!pitch) {
-        console.error('Pitch is undefined in BookingModal');
         setAvailableSlots([]);
         return;
       }
 
       const dateStr = toDateString(selectedDate);
-
-      // Mock available slots for now
-      const mockSlots = generateFallbackSlots();
-      setAvailableSlots(mockSlots);
-      return;
+      const response = await api.getFieldSlots(pitch.id, dateStr);
+      
+      // Find slots for the selected date (the API returns an array of dates)
+      const dateData = response.dates.find(d => d.date === dateStr);
+      if (dateData) {
+        setAvailableSlots(dateData.slots);
+      } else {
+        setAvailableSlots([]);
+      }
     } catch (err) {
       console.error('Exception while fetching slots:', err);
-      // Fallback to generating slots from pitch working hours
-      const fallbackSlots = generateFallbackSlots();
-      setAvailableSlots(fallbackSlots);
+      setAvailableSlots([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const generateFallbackSlots = (): string[] => {
-    if (!pitch || !pitch.openTime || !pitch.closeTime) return [];
-
-    const startHour = parseInt(pitch.openTime.split(':')[0]);
-    const endHour = parseInt(pitch.closeTime.split(':')[0]);
-    const slots: string[] = [];
-
-    for (let hour = startHour; hour < endHour; hour++) {
-      const nextHour = hour + 1;
-      slots.push(`${hour.toString().padStart(2, '0')}:00 - ${nextHour.toString().padStart(2, '0')}:00`);
-    }
-
-    // Filter out past slots if today
-    const filteredSlots = filterPastSlots(slots, selectedDate);
-
-    return filteredSlots;
-  };
-
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
     setSelectedSlots([]);
+    setSelectedSlotIds([]);
     onDateChange(toDateString(date));
   };
 
@@ -97,17 +81,21 @@ export default function BookingModal({
     setSelectedSlots(slots);
   };
 
+  const handleSlotIdsChange = (slotIds: string[]) => {
+    setSelectedSlotIds(slotIds);
+  };
+
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
-    if (selectedSlots.length > 0 && !isSubmitting) {
+    if (selectedSlots.length > 0 && !isSubmitting && selectedSlotIds.length > 0) {
       setIsSubmitting(true);
       try {
         const dateStr = toDateString(selectedDate);
         const totalHours = selectedSlots.length;
         const totalPrice = pitch.pricePerHour * totalHours;
 
-        await onConfirm(dateStr, selectedSlots, totalHours, totalPrice);
+        await onConfirm(dateStr, selectedSlots, totalHours, totalPrice, selectedSlotIds);
       } finally {
         setIsSubmitting(false);
       }
@@ -147,9 +135,9 @@ export default function BookingModal({
           ) : (
             <TimeSlotPicker
               slots={availableSlots}
-              bookedSlots={bookedSlots}
               selectedSlots={selectedSlots}
               onSlotsChange={handleSlotsChange}
+              onSlotIdsChange={handleSlotIdsChange}
               pricePerHour={pitch.pricePerHour}
             />
           )}
@@ -159,9 +147,9 @@ export default function BookingModal({
         <div className="p-6 border-t border-slate-800 bg-slate-900">
           <button
             onClick={handleConfirm}
-            disabled={!hasValidSelection || isSubmitting || loading}
+            disabled={!hasValidSelection || isSubmitting || loading || selectedSlotIds.length === 0}
             className={`w-full py-4 rounded-xl font-semibold transition-colors ${
-              hasValidSelection && !isSubmitting && !loading
+              hasValidSelection && !isSubmitting && !loading && selectedSlotIds.length > 0
                 ? 'bg-blue-600 hover:bg-blue-700 text-white'
                 : 'bg-slate-800 text-slate-500 cursor-not-allowed'
             }`}

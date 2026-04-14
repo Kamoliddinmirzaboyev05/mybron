@@ -10,58 +10,43 @@ import {
   CheckCircle, 
   XCircle,
   Calendar,
-  User,
+  User as UserIcon,
   Phone
 } from 'lucide-react';
 import { formatPhoneNumber } from '../lib/phoneFormatter';
 import { toDateString } from '../lib/dateUtils';
+import { api, Booking, User } from '../lib/api';
 
-interface BookingWithPitch extends Omit<Booking, 'pitches'> {
-  pitches?: {
-    name: string;
-    location: string;
-  };
+interface AdminStats {
+  todayRevenue: number;
+  totalRevenue: number;
+  balance: number;
 }
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [todayBookings, setTodayBookings] = useState<BookingWithPitch[]>([]);
-  const [pendingBookings, setPendingBookings] = useState<BookingWithPitch[]>([]);
-  const [todayRevenue, setTodayRevenue] = useState(0);
+  const { user: authUser, loading: authLoading } = useAuth();
+  const [profile, setProfile] = useState<User | null>(null);
+  const [todayBookings, setTodayBookings] = useState<Booking[]>([]);
+  const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
+  const [stats, setStats] = useState<AdminStats>({ todayRevenue: 0, totalRevenue: 0, balance: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (authLoading) return;
 
-    if (!user) {
+    if (!authUser) {
       navigate('/login');
       return;
     }
 
     checkAdminAccess();
-  }, [user, authLoading, navigate]);
+  }, [authUser, authLoading, navigate]);
 
   const checkAdminAccess = async () => {
-    if (!user) return;
-
     try {
-      const { data: profileData, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        toast.error('Xatolik yuz berdi', {
-          description: 'Profil ma\'lumotlarini yuklab bo\'lmadi.'
-        });
-        navigate('/');
-        return;
-      }
-
+      const profileData = await api.getProfile();
+      
       if (profileData.role !== 'admin') {
         toast.error('Ruxsat yo\'q', {
           description: 'Bu sahifa faqat adminlar uchun.'
@@ -81,85 +66,30 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      await Promise.all([
-        fetchTodayBookings(),
-        fetchPendingBookings(),
-        fetchTodayRevenue()
+      const [allBookings, adminStats] = await Promise.all([
+        api.getAllBookings(),
+        api.getAdminStats().catch(() => ({ todayRevenue: 0, totalRevenue: 0, balance: 0 }))
       ]);
+
+      const today = toDateString(new Date());
+      
+      // Filter today's confirmed/manual bookings
+      const todayList = allBookings.filter(b => 
+        (b.bookingDate?.split('T')[0] === today) && 
+        (b.status === 'confirmed' || b.status === 'manual')
+      );
+      
+      // Filter pending bookings
+      const pendingList = allBookings.filter(b => b.status === 'pending');
+
+      setTodayBookings(todayList);
+      setPendingBookings(pendingList);
+      setStats(adminStats);
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      toast.error('Ma\'lumotlarni yuklashda xatolik');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchTodayBookings = async () => {
-    const today = toDateString(new Date());
-
-    try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          pitches (
-            name,
-            location
-          )
-        `)
-        .eq('booking_date', today)
-        .in('status', ['confirmed', 'manual'])
-        .order('start_time', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching today bookings:', error);
-      } else {
-        setTodayBookings(data || []);
-      }
-    } catch (err) {
-      console.error('Exception fetching today bookings:', err);
-    }
-  };
-
-  const fetchPendingBookings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          pitches (
-            name,
-            location
-          )
-        `)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching pending bookings:', error);
-      } else {
-        setPendingBookings(data || []);
-      }
-    } catch (err) {
-      console.error('Exception fetching pending bookings:', err);
-    }
-  };
-
-  const fetchTodayRevenue = async () => {
-    const today = toDateString(new Date());
-
-    try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('total_price')
-        .eq('booking_date', today)
-        .in('status', ['confirmed', 'manual']);
-
-      if (error) {
-        console.error('Error fetching today revenue:', error);
-      } else {
-        const revenue = data?.reduce((sum, booking) => sum + (booking.total_price || 0), 0) || 0;
-        setTodayRevenue(revenue);
-      }
-    } catch (err) {
-      console.error('Exception fetching today revenue:', err);
     }
   };
 
@@ -167,25 +97,12 @@ export default function AdminDashboard() {
     const loadingToast = toast.loading('Tasdiqlanmoqda...');
 
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'confirmed' })
-        .eq('id', bookingId);
-
-      if (error) {
-        console.error('Error approving booking:', error);
-        toast.error('Xatolik yuz berdi', {
-          id: loadingToast,
-          description: 'Qaytadan urinib ko\'ring.'
-        });
-      } else {
-        toast.success('Bron tasdiqlandi!', {
-          id: loadingToast,
-          description: 'Foydalanuvchiga xabar yuborildi.'
-        });
-        // Refresh data
-        fetchDashboardData();
-      }
+      await api.updateBookingStatus(bookingId, 'confirmed');
+      toast.success('Bron tasdiqlandi!', {
+        id: loadingToast,
+        description: 'Foydalanuvchiga xabar yuborildi.'
+      });
+      fetchDashboardData();
     } catch (err) {
       console.error('Exception approving booking:', err);
       toast.error('Xatolik yuz berdi', {
@@ -199,25 +116,12 @@ export default function AdminDashboard() {
     const loadingToast = toast.loading('Rad etilmoqda...');
 
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'rejected' })
-        .eq('id', bookingId);
-
-      if (error) {
-        console.error('Error rejecting booking:', error);
-        toast.error('Xatolik yuz berdi', {
-          id: loadingToast,
-          description: 'Qaytadan urinib ko\'ring.'
-        });
-      } else {
-        toast.success('Bron rad etildi', {
-          id: loadingToast,
-          description: 'Vaqt endi boshqalar uchun ochiq.'
-        });
-        // Refresh data
-        fetchDashboardData();
-      }
+      await api.updateBookingStatus(bookingId, 'rejected');
+      toast.success('Bron rad etildi', {
+        id: loadingToast,
+        description: 'Vaqt endi boshqalar uchun ochiq.'
+      });
+      fetchDashboardData();
     } catch (err) {
       console.error('Exception rejecting booking:', err);
       toast.error('Xatolik yuz berdi', {
@@ -233,21 +137,26 @@ export default function AdminDashboard() {
     });
   };
 
-  const formatTime = (time: string) => {
+  const formatTime = (time?: string) => {
+    if (!time) return '';
     return time.slice(0, 5); // HH:MM
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '';
     const date = new Date(dateStr);
     const days = ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Jum', 'Shan'];
     const months = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
     return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
   };
 
-  const isBookingPast = (booking: BookingWithPitch) => {
+  const isBookingPast = (booking: Booking) => {
     const now = new Date();
-    const bookingDate = new Date(booking.booking_date);
-    const [hours] = booking.end_time.split(':').map(Number);
+    const bDate = booking.bookingDate;
+    if (!bDate || !booking.endTime) return false;
+    
+    const bookingDate = new Date(bDate);
+    const [hours] = booking.endTime.split(':').map(Number);
     bookingDate.setHours(hours, 0, 0, 0);
     return bookingDate < now;
   };
@@ -266,7 +175,7 @@ export default function AdminDashboard() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
-          <p className="text-slate-400">Bugungi sana: {formatDate(toDateString(new Date()))}</p>
+          <p className="text-slate-400">Bugungi sana: {formatDate(new Date().toISOString())}</p>
         </div>
 
         {/* 3-Column Layout */}
@@ -284,7 +193,7 @@ export default function AdminDashboard() {
                 <div className="text-sm text-green-300">Bugungi daromad</div>
               </div>
               <div className="text-3xl font-bold text-white">
-                {todayRevenue.toLocaleString()} so'm
+                {stats.todayRevenue.toLocaleString()} so'm
               </div>
             </div>
 
@@ -297,7 +206,7 @@ export default function AdminDashboard() {
                 <div className="text-sm text-blue-300">Jami daromad</div>
               </div>
               <div className="text-3xl font-bold text-white">
-                {(profile?.total_revenue || 0).toLocaleString()} so'm
+                {stats.totalRevenue.toLocaleString()} so'm
               </div>
             </div>
 
@@ -310,7 +219,7 @@ export default function AdminDashboard() {
                 <div className="text-sm text-purple-300">Joriy balans</div>
               </div>
               <div className="text-3xl font-bold text-white mb-4">
-                {(profile?.balance || 0).toLocaleString()} so'm
+                {stats.balance.toLocaleString()} so'm
               </div>
               <button
                 onClick={handleWithdraw}
@@ -334,6 +243,9 @@ export default function AdminDashboard() {
                 <div className="space-y-4">
                   {todayBookings.map((booking) => {
                     const isPast = isBookingPast(booking);
+                    const pitchName = booking.field?.name || 'Unknown Pitch';
+                    const pitchLocation = booking.field ? `${booking.field.address}, ${booking.field.city}` : 'N/A';
+                    
                     return (
                       <div
                         key={booking.id}
@@ -346,28 +258,28 @@ export default function AdminDashboard() {
                         <div className="flex items-start justify-between mb-3">
                           <div>
                             <div className="font-semibold text-white mb-1">
-                              {booking.pitches?.name || 'Unknown Pitch'}
+                              {pitchName}
                             </div>
                             <div className="text-sm text-slate-400">
-                              {booking.pitches?.location}
+                              {pitchLocation}
                             </div>
                           </div>
                           <div className={`text-sm font-medium ${isPast ? 'text-slate-500' : 'text-blue-400'}`}>
-                            {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
+                            {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
                           </div>
                         </div>
                         <div className="space-y-1 text-sm">
                           <div className="flex items-center gap-2 text-slate-400">
-                            <User className="w-4 h-4" />
-                            <span>{booking.full_name || 'N/A'}</span>
+                            <UserIcon className="w-4 h-4" />
+                            <span>{booking.clientName || 'N/A'}</span>
                           </div>
                           <div className="flex items-center gap-2 text-slate-400">
                             <Phone className="w-4 h-4" />
-                            <span>{booking.phone ? formatPhoneNumber(booking.phone) : 'N/A'}</span>
+                            <span>{booking.clientPhone ? formatPhoneNumber(booking.clientPhone) : 'N/A'}</span>
                           </div>
                           <div className="flex items-center gap-2 text-green-400 font-medium">
                             <DollarSign className="w-4 h-4" />
-                            <span>{(booking.total_price || 0).toLocaleString()} so'm</span>
+                            <span>{(booking.totalPrice || 0).toLocaleString()} so'm</span>
                           </div>
                         </div>
                       </div>
@@ -396,62 +308,67 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {pendingBookings.map((booking) => (
-                    <div
-                      key={booking.id}
-                      className="border border-yellow-500/30 bg-yellow-500/10 rounded-lg p-4"
-                    >
-                      <div className="mb-3">
-                        <div className="font-semibold text-white mb-1">
-                          {booking.pitches?.name || 'Unknown Pitch'}
+                  {pendingBookings.map((booking) => {
+                    const pitchName = booking.field?.name || 'Unknown Pitch';
+                    const pitchLocation = booking.field ? `${booking.field.address}, ${booking.field.city}` : 'N/A';
+                    
+                    return (
+                      <div
+                        key={booking.id}
+                        className="border border-yellow-500/30 bg-yellow-500/10 rounded-lg p-4"
+                      >
+                        <div className="mb-3">
+                          <div className="font-semibold text-white mb-1">
+                            {pitchName}
+                          </div>
+                          <div className="text-sm text-slate-400 mb-2">
+                            {pitchLocation}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-yellow-400">
+                            <Calendar className="w-4 h-4" />
+                            <span>{formatDate(booking.bookingDate)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-yellow-400 mt-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{formatTime(booking.startTime)} - {formatTime(booking.endTime)}</span>
+                          </div>
                         </div>
-                        <div className="text-sm text-slate-400 mb-2">
-                          {booking.pitches?.location}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-yellow-400">
-                          <Calendar className="w-4 h-4" />
-                          <span>{formatDate(booking.booking_date)}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-yellow-400 mt-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{formatTime(booking.start_time)} - {formatTime(booking.end_time)}</span>
-                        </div>
-                      </div>
 
-                      <div className="space-y-1 text-sm mb-4 pb-4 border-b border-slate-700">
-                        <div className="flex items-center gap-2 text-slate-400">
-                          <User className="w-4 h-4" />
-                          <span>{booking.full_name || 'N/A'}</span>
+                        <div className="space-y-1 text-sm mb-4 pb-4 border-b border-slate-700">
+                          <div className="flex items-center gap-2 text-slate-400">
+                            <UserIcon className="w-4 h-4" />
+                            <span>{booking.clientName || 'N/A'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-400">
+                            <Phone className="w-4 h-4" />
+                            <span>{booking.clientPhone ? formatPhoneNumber(booking.clientPhone) : 'N/A'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-green-400 font-medium">
+                            <DollarSign className="w-4 h-4" />
+                            <span>{(booking.totalPrice || 0).toLocaleString()} so'm</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 text-slate-400">
-                          <Phone className="w-4 h-4" />
-                          <span>{booking.phone ? formatPhoneNumber(booking.phone) : 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-green-400 font-medium">
-                          <DollarSign className="w-4 h-4" />
-                          <span>{(booking.total_price || 0).toLocaleString()} so'm</span>
-                        </div>
-                      </div>
 
-                      {/* Action Buttons */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          onClick={() => handleApproveBooking(booking.id)}
-                          className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-colors"
-                        >
-                          <CheckCircle className="w-5 h-5" />
-                          Tasdiqlash
-                        </button>
-                        <button
-                          onClick={() => handleRejectBooking(booking.id)}
-                          className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-semibold transition-colors"
-                        >
-                          <XCircle className="w-5 h-5" />
-                          Rad etish
-                        </button>
+                        {/* Action Buttons */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            onClick={() => handleApproveBooking(booking.id)}
+                            className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-colors"
+                          >
+                            <CheckCircle className="w-5 h-5" />
+                            Tasdiqlash
+                          </button>
+                          <button
+                            onClick={() => handleRejectBooking(booking.id)}
+                            className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-semibold transition-colors"
+                          >
+                            <XCircle className="w-5 h-5" />
+                            Rad etish
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

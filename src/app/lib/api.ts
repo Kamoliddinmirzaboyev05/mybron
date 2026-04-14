@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 
 // API Configuration
-const API_BASE_URL = 'https://gobron-backend.onrender.com/api/v1';
+const API_BASE_URL = 'https://gobron-backend-production.up.railway.app/api/v1';
 
 // Types
 export interface User {
@@ -20,6 +20,7 @@ export interface AuthResponse {
 export interface RegisterData {
   fullName: string;
   login: string;
+  phone: string;
   password: string;
   role?: 'user';
 }
@@ -54,14 +55,22 @@ export interface Pitch {
 
 export interface Booking {
   id: string;
-  pitchId: string;
   userId: string;
-  date: string;
-  timeSlots: string[];
-  totalHours: number;
+  fieldId: string;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
   totalPrice: number;
+  status: 'pending' | 'confirmed' | 'rejected' | 'cancelled' | 'manual';
+  paymentMethod?: string;
+  clientName?: string | null;
+  clientPhone?: string | null;
+  note?: string | null;
   createdAt: string;
-  pitch?: Pitch;
+  confirmedAt?: string | null;
+  rejectedAt?: string | null;
+  rejectReason?: string | null;
+  field?: Pitch;
 }
 
 export interface Review {
@@ -74,6 +83,21 @@ export interface Review {
   user?: {
     fullName: string;
   };
+}
+
+export interface FieldSlot {
+  id: string;
+  startTime: string;
+  endTime: string;
+  isAvailable: boolean;
+}
+
+export interface FieldSlotsResponse {
+  dates: {
+    date: string;
+    dayLabel: string;
+    slots: FieldSlot[];
+  }[];
 }
 
 // API Client
@@ -130,20 +154,10 @@ class ApiClient {
 
   // Auth methods
   async register(data: RegisterData): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    const result = await this.request<any>('/auth/register', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(data),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
     
     // Store the access token
     this.setToken(result.accessToken);
@@ -158,20 +172,10 @@ class ApiClient {
   }
 
   async login(data: LoginData): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    const result = await this.request<any>('/auth/login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(data),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
     
     // Store the access token
     this.setToken(result.accessToken);
@@ -204,16 +208,16 @@ class ApiClient {
 
   // Booking methods
   async getBookings(userId: string): Promise<Booking[]> {
-    return this.request<Booking[]>(`/bookings/user/${userId}`);
+    return this.request<Booking[]>('/bookings/my');
   }
 
   async createBooking(bookingData: {
-    pitchId: string;
-    userId: string;
-    date: string;
-    timeSlots: string[];
-    totalHours: number;
+    fieldId: string;
+    bookingDate: string;
+    startTime: string;
+    endTime: string;
     totalPrice: number;
+    note?: string;
   }): Promise<Booking> {
     return this.request<Booking>('/bookings', {
       method: 'POST',
@@ -221,8 +225,68 @@ class ApiClient {
     });
   }
 
-  async getBookedSlots(pitchId: string, dateStr: string): Promise<string[]> {
-    return this.request<string[]>(`/bookings/slots/${pitchId}?date=${dateStr}`);
+  async bookSlot(slotData: {
+    slotId: string;
+    fieldId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+  }): Promise<Booking> {
+    return this.request<Booking>('/slots/book', {
+      method: 'POST',
+      body: JSON.stringify(slotData),
+    });
+  }
+
+  async getFieldSlots(pitchId: string, dateStr: string): Promise<FieldSlotsResponse> {
+    return this.request<FieldSlotsResponse>(`/slots/field/${pitchId}?date=${dateStr}`);
+  }
+
+  async updateBookingStatus(bookingId: string, status: string): Promise<Booking> {
+    return this.request<Booking>(`/bookings/${bookingId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async cancelBooking(bookingId: string): Promise<void> {
+    return this.request<void>(`/bookings/${bookingId}/cancel`, {
+      method: 'PATCH',
+    });
+  }
+
+  // Admin methods
+  async getAdminBookings(status?: string): Promise<Booking[]> {
+    const endpoint = status ? `/bookings/admin?status=${status}` : '/bookings/admin';
+    return this.request<Booking[]>(endpoint);
+  }
+
+  async getAllBookings(status?: string): Promise<Booking[]> {
+    const endpoint = status ? `/bookings/all?status=${status}` : '/bookings/all';
+    return this.request<Booking[]>(endpoint);
+  }
+
+  async getAdminStats(): Promise<{ todayRevenue: number; totalRevenue: number; balance: number }> {
+    // Note: Stats endpoint not found in swagger, but keeping it as a placeholder or assuming it exists on a different path
+    return this.request<{ todayRevenue: number; totalRevenue: number; balance: number }>('/bookings/admin/stats');
+  }
+
+  // Favorite methods
+  async getFavorites(): Promise<{ id: string; fieldId: string }[]> {
+    return this.request<{ id: string; fieldId: string }[]>('/favorites/my');
+  }
+
+  async addFavorite(fieldId: string): Promise<{ id: string; fieldId: string }> {
+    return this.request<{ id: string; fieldId: string }>('/favorites', {
+      method: 'POST',
+      body: JSON.stringify({ fieldId }),
+    });
+  }
+
+  async removeFavorite(fieldId: string): Promise<void> {
+    return this.request<void>(`/favorites/${fieldId}`, {
+      method: 'DELETE',
+    });
   }
 
   // Review methods

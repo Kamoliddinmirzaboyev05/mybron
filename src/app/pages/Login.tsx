@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../lib/AuthContext';
-import { Mail, Lock, AlertCircle } from 'lucide-react';
+import { User, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -32,7 +32,7 @@ export default function Login() {
         navigate('/');
       }
     } catch (error: any) {
-      setError(error.message || 'Login failed');
+      setError(error.message || 'Kirishda xatolik yuz berdi');
       setLoading(false);
     }
   };
@@ -42,11 +42,11 @@ export default function Login() {
       <div className="max-w-md w-full">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden bg-white/5 p-2">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden bg-white/5 p-2 border border-slate-800">
             <img src="/bronlogo.png" alt="Bron Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-          <p className="text-slate-400">Sign in to book your pitch</p>
+          <h1 className="text-3xl font-bold text-white mb-2">Xush kelibsiz</h1>
+          <p className="text-slate-400">Maydonlarni band qilish uchun tizimga kiring</p>
         </div>
 
         {/* Error Message */}
@@ -61,15 +61,15 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Login
+              Login yoki telefon raqami
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
               <input
                 type="text"
                 value={login}
                 onChange={(e) => setLogin(e.target.value)}
-                placeholder="your login"
+                placeholder="login yoki +998..."
                 required
                 className="w-full pl-11 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
               />
@@ -78,7 +78,7 @@ export default function Login() {
 
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Password
+              Parol
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
@@ -98,19 +98,19 @@ export default function Login() {
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-800 disabled:text-slate-500 text-white py-3 rounded-lg font-semibold transition-colors"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Kirilmoqda...' : 'Kirish'}
           </button>
         </form>
 
         {/* Register Link */}
         <div className="mt-6 text-center">
           <p className="text-slate-400">
-            Don't have an account?{' '}
+            Hisobingiz yo'qmi?{' '}
             <button
               onClick={() => navigate('/register')}
               className="text-blue-500 hover:text-blue-400 font-medium transition-colors"
             >
-              Sign Up
+              Ro'yxatdan o'tish
             </button>
           </p>
         </div>
