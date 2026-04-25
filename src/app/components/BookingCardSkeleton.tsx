@@ -21,7 +21,7 @@ export default function BookingCardSkeleton() {
         </div>
 
         {/* Customer Info */}
-        <div className="bg-slate-950 rounded-lg p-3 mb-3">
+        <div className="bg-[#020817] rounded-lg p-3 mb-3">
           <div className="h-3 bg-slate-800/50 rounded w-24 mb-2"></div>
           <div className="space-y-1">
             <div className="h-4 bg-slate-800/50 rounded w-full"></div>

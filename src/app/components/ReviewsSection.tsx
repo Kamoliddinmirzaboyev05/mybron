@@ -88,56 +88,40 @@ export default function ReviewsSection({ pitchId }: ReviewsSectionProps) {
 
       {/* Add Review Form */}
       {showAddReview && (
-        <div className="bg-slate-800 rounded-xl p-4 mb-4 border border-slate-700">
+        <div className="bg-[#0d1526] rounded-2xl p-4 mb-4 border border-white/10">
           <div className="mb-3">
-            <label className="text-sm text-slate-300 mb-2 block">Baho</label>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Baho</label>
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setRating(star)}
-                  className="transition-transform hover:scale-110"
-                >
-                  <Star
-                    className={`w-6 h-6 ${
-                      star <= rating
-                        ? 'text-yellow-400 fill-current'
-                        : 'text-slate-600'
-                    }`}
-                  />
+                <button key={star} onClick={() => setRating(star)} className="transition-transform hover:scale-110">
+                  <Star className={`w-7 h-7 ${star <= rating ? 'text-amber-400 fill-current' : 'text-slate-700'}`} />
                 </button>
               ))}
             </div>
           </div>
-          
           <div className="mb-3">
-            <label className="text-sm text-slate-300 mb-2 block">Sharh</label>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Sharh</label>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Tajribangiz haqida yozing..."
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/60 resize-none transition-all"
               rows={3}
             />
           </div>
-          
           <div className="flex gap-2">
             <button
               onClick={handleSubmitReview}
               disabled={submitting || !comment.trim()}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg text-sm font-medium transition-colors"
+              className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-white/5 disabled:text-slate-600 text-white rounded-xl text-sm font-bold transition-colors"
             >
               {submitting ? 'Yuklanmoqda...' : 'Yuborish'}
             </button>
             <button
-              onClick={() => {
-                setShowAddReview(false);
-                setComment('');
-                setRating(5);
-              }}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors"
+              onClick={() => { setShowAddReview(false); setComment(''); setRating(5); }}
+              className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-medium transition-colors"
             >
-              Bekor qilish
+              Bekor
             </button>
           </div>
         </div>
@@ -145,44 +129,30 @@ export default function ReviewsSection({ pitchId }: ReviewsSectionProps) {
 
       {/* Reviews List */}
       {loading ? (
-        <div className="text-center py-8 text-slate-400">Yuklanmoqda...</div>
+        <div className="text-center py-8 text-slate-500">Yuklanmoqda...</div>
       ) : reviews.length === 0 ? (
-        <div className="text-center py-8 text-slate-400">
+        <div className="text-center py-8 text-slate-500 text-sm">
           Hali sharhlar yo'q. Birinchi bo'lib sharh qoldiring!
         </div>
       ) : (
         <div className="space-y-3">
           {reviews.map((review) => (
-            <div
-              key={review.id}
-              className="bg-slate-800 rounded-xl p-4 border border-slate-700"
-            >
+            <div key={review.id} className="bg-[#0d1526] rounded-2xl p-4 border border-white/5">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
-                  <User className="w-5 h-5 text-slate-400" />
+                <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 text-slate-500" />
                 </div>
-                
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-white font-medium">
-                      {review.user?.fullName || 'Foydalanuvchi'}
-                    </span>
+                    <span className="text-white font-semibold text-sm">{review.user?.fullName || 'Foydalanuvchi'}</span>
                     <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="text-white text-sm font-semibold">{review.rating}</span>
+                      <Star className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                      <span className="text-white text-sm font-bold">{review.rating}</span>
                     </div>
                   </div>
-                  
-                  {review.comment && (
-                    <p className="text-slate-300 text-sm mb-2">{review.comment}</p>
-                  )}
-                  
-                  <span className="text-slate-500 text-xs">
-                    {new Date(review.createdAt || '').toLocaleDateString('uz-UZ', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
+                  {review.comment && <p className="text-slate-400 text-sm mb-1.5">{review.comment}</p>}
+                  <span className="text-slate-600 text-xs">
+                    {new Date(review.createdAt || '').toLocaleDateString('uz-UZ', { year: 'numeric', month: 'long', day: 'numeric' })}
                   </span>
                 </div>
               </div>

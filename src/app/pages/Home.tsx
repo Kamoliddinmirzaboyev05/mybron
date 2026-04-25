@@ -6,33 +6,17 @@ import PitchCardSkeleton from '../components/PitchCardSkeleton';
 import SearchBar from '../components/SearchBar';
 import QuickFilters from '../components/QuickFilters';
 import { useNavigate } from 'react-router';
-import { getUserLocation, calculateDistance, formatDistance, Coordinates } from '../lib/geoUtils';
-import { MapPin, Users, Star } from 'lucide-react';
+import { getUserLocation, calculateDistance, Coordinates } from '../lib/geoUtils';
+import { MapPin, Users, Star, Zap, Download, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 
-// Types
 interface Field {
-  id: string;
-  userId: string;
-  name: string;
-  address: string;
-  city: string;
-  lat: number | null;
-  lng: number | null;
-  pricePerHour: number;
-  size: string;
-  surface: string;
-  description: string;
-  amenities: string[];
-  images: string[];
-  openTime: string;
-  closeTime: string;
-  phone: string;
-  isActive: boolean;
-  rating: number;
-  reviewCount: number;
-  createdAt: string;
+  id: string; userId: string; name: string; address: string; city: string;
+  lat: number | null; lng: number | null; pricePerHour: number; size: string;
+  surface: string; description: string; amenities: string[]; images: string[];
+  openTime: string; closeTime: string; phone: string; isActive: boolean;
+  rating: number; reviewCount: number; createdAt: string;
 }
 
 export default function Home() {
@@ -43,259 +27,232 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [fieldRatings, setFieldRatings] = useState<Map<string, number>>(new Map());
   const [fieldDistances, setFieldDistances] = useState<Map<string, number>>(new Map());
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [averageRating, setAverageRating] = useState(0);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
   const navigate = useNavigate();
+
+  // PWA install prompt
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const dismissed = sessionStorage.getItem('pwa_banner_dismissed');
+    if (isStandalone || dismissed) return;
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+
+    // Show banner even without prompt (iOS Safari)
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (isIOS && !dismissed) setShowInstallBanner(true);
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
 
   useEffect(() => {
     fetchFields();
-    fetchStatistics();
-    getUserLocationData();
-    if (user) {
-      fetchFavorites();
-    }
+    getUserLocation().then(loc => { if (loc) setUserLocation(loc); });
+    if (user) fetchFavorites();
   }, [user]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [fields, searchQuery, activeFilter, fieldDistances, userLocation]);
+  useEffect(() => { applyFilters(); }, [fields, searchQuery, activeFilter, fieldDistances]);
 
-  const getUserLocationData = async () => {
-    const location = await getUserLocation();
-    if (location) {
-      setUserLocation(location);
-      console.log('User location obtained:', location);
+  useEffect(() => {
+    if (userLocation && fields.length) {
+      const distances = new Map<string, number>();
+      fields.forEach(f => {
+        if (f.lat && f.lng)
+          distances.set(f.id, calculateDistance(userLocation, { latitude: f.lat, longitude: f.lng }));
+      });
+      setFieldDistances(distances);
     }
-  };
+  }, [userLocation, fields]);
 
   const fetchFields = async () => {
     try {
       const response = await api.getFields();
       setFields(response);
-
-      // Calculate distances if user location is available
-      if (userLocation && response) {
-        calculateFieldDistances(response, userLocation);
-      }
-
-      // Set mock ratings
-      setFieldRatings(new Map(response.map(field => [field.id, field.rating || 0])));
-
-      // Set mock statistics
-      setTotalUsers(1500);
-      setAverageRating(4.3);
     } catch (err) {
-      console.error('Exception while fetching fields:', err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateFieldDistances = (fieldList: Field[], location: Coordinates) => {
-    const distances = new Map<string, number>();
-    fieldList.forEach(field => {
-      if (field.lat && field.lng) {
-        const distance = calculateDistance(location, {
-          latitude: field.lat,
-          longitude: field.lng
-        });
-        distances.set(field.id, distance);
-      }
-    });
-    setFieldDistances(distances);
-  };
-
-  const fetchStatistics = async () => {
-    // Mock statistics
-    setTotalUsers(1500);
-    setAverageRating(4.3);
-  };
-
   const fetchFavorites = async () => {
-    if (!user) return;
-
     try {
-      const response = await api.getFavorites();
-      const favoriteIds = new Set(response.map(f => f.fieldId));
-      setFavorites(favoriteIds);
-    } catch (err) {
-      console.error('Exception while fetching favorites:', err);
-    }
+      const res = await api.getFavorites();
+      setFavorites(new Set(res.map(f => f.fieldId)));
+    } catch {}
   };
 
   const handleFavoriteToggle = async (fieldId: string) => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    const isFavorited = favorites.has(fieldId);
-
-    // Optimistic UI update
-    const newFavorites = new Set(favorites);
-    if (isFavorited) {
-      newFavorites.delete(fieldId);
-    } else {
-      newFavorites.add(fieldId);
-    }
-    setFavorites(newFavorites);
-
+    if (!user) { navigate('/login'); return; }
+    const isFav = favorites.has(fieldId);
+    const next = new Set(favorites);
+    isFav ? next.delete(fieldId) : next.add(fieldId);
+    setFavorites(next);
     try {
-      if (isFavorited) {
-        await api.removeFavorite(fieldId);
-      } else {
-        await api.addFavorite(fieldId);
-      }
-    } catch (err) {
-      console.error('Exception while toggling favorite:', err);
-      // Revert on error
-      const revertedFavorites = new Set(favorites);
-      setFavorites(revertedFavorites);
+      isFav ? await api.removeFavorite(fieldId) : await api.addFavorite(fieldId);
+    } catch {
+      setFavorites(favorites);
       toast.error('Xatolik yuz berdi');
     }
   };
 
   const applyFilters = () => {
     let filtered = [...fields];
-
-    // Search filter
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        field =>
-          field.name.toLowerCase().includes(query) ||
-          field.address.toLowerCase().includes(query) ||
-          field.city.toLowerCase().includes(query)
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(f =>
+        f.name.toLowerCase().includes(q) ||
+        f.address.toLowerCase().includes(q) ||
+        f.city.toLowerCase().includes(q)
       );
     }
-
-    // Quick filters
-    if (activeFilter === 'cheap') {
-      filtered.sort((a, b) => a.pricePerHour - b.pricePerHour);
-    } else if (activeFilter === 'shower') {
-      filtered = filtered.filter(field =>
-        field.amenities?.some(a => a.toLowerCase().includes('dush'))
-      );
-    } else if (activeFilter === '24/7') {
-      filtered = filtered.filter(field => {
-        const start = parseInt(field.openTime?.split(':')[0] || '0');
-        const end = parseInt(field.closeTime?.split(':')[0] || '0');
-        return start === 0 && end === 24;
-      });
-    } else if (activeFilter === 'nearby') {
-      // Sort by distance (closest first)
-      if (userLocation && fieldDistances.size > 0) {
-        filtered.sort((a, b) => {
-          const distA = fieldDistances.get(a.id) || Infinity;
-          const distB = fieldDistances.get(b.id) || Infinity;
-          return distA - distB;
-        });
-      }
-    }
-
+    if (activeFilter === 'cheap') filtered.sort((a, b) => a.pricePerHour - b.pricePerHour);
+    else if (activeFilter === 'shower') filtered = filtered.filter(f => f.amenities?.some(a => a.toLowerCase().includes('dush')));
+    else if (activeFilter === '24/7') filtered = filtered.filter(f => parseInt(f.openTime) === 0 && parseInt(f.closeTime) >= 23);
+    else if (activeFilter === 'nearby' && fieldDistances.size > 0)
+      filtered.sort((a, b) => (fieldDistances.get(a.id) || Infinity) - (fieldDistances.get(b.id) || Infinity));
     setFilteredFields(filtered);
   };
 
-  const getUserName = () => {
-    if (!user) return 'Mehmon';
-    return user.fullName || user.login || 'Foydalanuvchi';
+  const handleInstallPWA = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') setShowInstallBanner(false);
+      setDeferredPrompt(null);
+    }
   };
 
+  const dismissBanner = () => {
+    setShowInstallBanner(false);
+    sessionStorage.setItem('pwa_banner_dismissed', '1');
+  };
+
+  const getUserName = () => user?.fullName?.split(' ')[0] || 'Mehmon';
+  const avgRating = fields.length
+    ? (fields.reduce((s, f) => s + (f.rating || 0), 0) / fields.length).toFixed(1)
+    : '5.0';
+
   return (
-    <div className="min-h-screen bg-slate-950 pb-20">
+    <div className="min-h-screen bg-[#020817] pb-24">
       <div className="max-w-md mx-auto">
-        {/* Header with Dynamic Greeting */}
-        <div className="sticky top-0 bg-slate-950 z-10 border-b border-slate-800">
-          <div className="px-4 py-6">
-            <div className="flex items-center justify-between mb-3">
+
+        {/* ── Header ── */}
+        <div className="sticky top-0 bg-[#020817]/95 backdrop-blur-md z-10 border-b border-white/5">
+          <div className="px-4 pt-12 pb-3">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/5 p-1.5">
-                  <img src="/bronlogo.png" alt="Bron Logo" className="w-full h-full object-contain" />
+                <div className="w-9 h-9 rounded-lg overflow-hidden bg-white/5 p-1.5 border border-white/10 flex-shrink-0">
+                  <img src="/bronlogo.png" alt="MYBRON" className="w-full h-full object-contain" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-white">Salom, {getUserName()}!</h1>
-                  <p className="text-slate-400 text-sm">Bugun qayerda o'ynaymiz?</p>
+                  <h1 className="text-base font-bold text-white leading-tight">
+                    Salom, {getUserName()} 👋
+                  </h1>
+                  <p className="text-slate-500 text-xs">Bugun qayerda o'ynaymiz?</p>
                 </div>
+              </div>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-500/10 border border-green-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-green-400 text-xs font-semibold">Ochiq</span>
               </div>
             </div>
           </div>
-
-          {/* Search Bar */}
           <SearchBar value={searchQuery} onChange={setSearchQuery} />
-
-          {/* Quick Filters */}
           <QuickFilters activeFilter={activeFilter} onFilterChange={setActiveFilter} />
         </div>
 
-        {/* Statistics Bar - Social Proof */}
-        <div className="px-4 py-6 border-b border-slate-800">
-          <div className="grid grid-cols-3 gap-4">
-            {/* Total Fields */}
-            <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-xl p-4 text-center">
-              <div className="flex items-center justify-center mb-2">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <MapPin className="w-5 h-5 text-blue-400" />
-                </div>
+        {/* ── PWA Install Banner ── */}
+        {showInstallBanner && (
+          <div className="mx-4 mt-4">
+            <div className="flex items-center gap-3 p-3.5 bg-[#0d1526] border border-blue-500/20 rounded-xl">
+              <div className="w-9 h-9 rounded-lg bg-blue-600/20 flex items-center justify-center flex-shrink-0">
+                <Download className="w-4 h-4 text-blue-400" />
               </div>
-              <div className="text-2xl font-bold text-white mb-1">
-                {fields.length}+
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-bold">Ilovani yuklab olish</p>
+                <p className="text-slate-500 text-xs">Telefonga o'rnatib tezroq ishlating</p>
               </div>
-              <div className="text-xs text-slate-400">Maydonlar</div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={handleInstallPWA}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors"
+                >
+                  O'rnatish
+                </button>
+                <button onClick={dismissBanner} className="p-1 text-slate-600 hover:text-slate-400 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+          </div>
+        )}
 
-            {/* Total Users */}
-            <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 rounded-xl p-4 text-center">
-              <div className="flex items-center justify-center mb-2">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <Users className="w-5 h-5 text-green-400" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-white mb-1">
-                {totalUsers}+
-              </div>
-              <div className="text-xs text-slate-400">Foydalanuvchilar</div>
-            </div>
-
-            {/* Average Rating */}
-            <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border border-yellow-500/20 rounded-xl p-4 text-center">
-              <div className="flex items-center justify-center mb-2">
-                <div className="p-2 bg-yellow-500/20 rounded-lg">
-                  <Star className="w-5 h-5 text-yellow-400" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-white mb-1">
-                {averageRating > 0 ? averageRating.toFixed(1) : '5.0'}
-              </div>
-              <div className="text-xs text-slate-400">O'rtacha reyting</div>
-            </div>
+        {/* ── Stats ── */}
+        <div className="px-4 py-4">
+          <div className="grid grid-cols-3 gap-2">
+            <StatCard
+              icon={<MapPin className="w-4 h-4 text-blue-400" />}
+              value={String(fields.length)}
+              label="Maydonlar"
+              from="from-blue-600/15" border="border-blue-500/15"
+            />
+            <StatCard
+              icon={<Users className="w-4 h-4 text-emerald-400" />}
+              value="1.5k"
+              label="Foydalanuvchi"
+              from="from-emerald-600/15" border="border-emerald-500/15"
+            />
+            <StatCard
+              icon={<Star className="w-4 h-4 text-amber-400" />}
+              value={avgRating}
+              label="O'rtacha"
+              from="from-amber-600/15" border="border-amber-500/15"
+            />
           </div>
         </div>
 
-        {/* Fields List */}
-        <div className="px-4 py-4">
+        {/* ── Section title ── */}
+        <div className="px-4 mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-white">
+              {activeFilter || searchQuery ? 'Natijalar' : 'Barcha maydonlar'}
+            </h2>
+            {!loading && (
+              <p className="text-xs text-slate-600 mt-0.5">{filteredFields.length} ta topildi</p>
+            )}
+          </div>
+          {(searchQuery || activeFilter) && (
+            <button
+              onClick={() => { setSearchQuery(''); setActiveFilter(null); }}
+              className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              Tozalash
+            </button>
+          )}
+        </div>
+
+        {/* ── Fields Grid ── */}
+        <div className="px-4 pb-4">
           {loading ? (
             <div className="grid grid-cols-2 gap-3">
-              {[...Array(6)].map((_, i) => (
-                <PitchCardSkeleton key={i} />
-              ))}
+              {[...Array(6)].map((_, i) => <PitchCardSkeleton key={i} />)}
             </div>
           ) : filteredFields.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="text-slate-400 mb-2">Maydonlar topilmadi</div>
-              {(searchQuery || activeFilter) && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setActiveFilter(null);
-                  }}
-                  className="text-blue-500 text-sm hover:underline"
-                >
-                  Filtrlarni tozalash
-                </button>
-              )}
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center mb-4 border border-white/8">
+                <Zap className="w-6 h-6 text-slate-600" />
+              </div>
+              <p className="text-white font-semibold text-sm mb-1">Maydon topilmadi</p>
+              <p className="text-slate-500 text-xs">Boshqa kalit so'z yoki filtr sinab ko'ring</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
@@ -306,15 +263,26 @@ export default function Home() {
                   isFavorite={favorites.has(field.id)}
                   onFavoriteToggle={handleFavoriteToggle}
                   distance={fieldDistances.get(field.id)}
-                  rating={fieldRatings.get(field.id)}
+                  rating={field.rating}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
-
       <BottomNav />
+    </div>
+  );
+}
+
+function StatCard({ icon, value, label, from, border }: {
+  icon: React.ReactNode; value: string; label: string; from: string; border: string;
+}) {
+  return (
+    <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${from} to-transparent border ${border} p-3`}>
+      <div className="mb-2">{icon}</div>
+      <div className="text-xl font-black text-white leading-none">{value}</div>
+      <div className="text-[10px] text-slate-500 mt-1">{label}</div>
     </div>
   );
 }

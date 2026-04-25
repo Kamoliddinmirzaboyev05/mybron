@@ -1,110 +1,111 @@
 import { useState } from 'react';
-import { MapPin, Heart, Star } from 'lucide-react';
+import { MapPin, Heart, Star, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import PitchCardSlider from './PitchCardSlider';
 
-// Types
 interface Field {
-  id: string;
-  userId: string;
-  name: string;
-  address: string;
-  city: string;
-  lat: number | null;
-  lng: number | null;
-  pricePerHour: number;
-  size: string;
-  surface: string;
-  description: string;
-  amenities: string[];
-  images: string[];
-  openTime: string;
-  closeTime: string;
-  phone: string;
-  isActive: boolean;
-  rating: number;
-  reviewCount: number;
-  createdAt: string;
+  id: string; name: string; address: string; city: string;
+  lat: number | null; lng: number | null; pricePerHour: number;
+  size: string; surface: string; amenities: string[]; images: string[];
+  openTime: string; closeTime: string; rating: number; reviewCount: number;
+  isActive: boolean; userId: string; description: string; phone: string; createdAt: string;
 }
 
-interface EnhancedPitchCardProps {
+interface Props {
   pitch: Field;
   isFavorite: boolean;
-  onFavoriteToggle: (fieldId: string) => void;
+  onFavoriteToggle: (id: string) => void;
   distance?: number;
   rating?: number;
 }
 
-export default function EnhancedPitchCard({ 
-  pitch, 
-  isFavorite, 
-  onFavoriteToggle,
-  distance,
-  rating
-}: EnhancedPitchCardProps) {
+export default function EnhancedPitchCard({ pitch, isFavorite, onFavoriteToggle, distance, rating }: Props) {
   const navigate = useNavigate();
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [animating, setAnimating] = useState(false);
 
-  const handleFavoriteClick = (e: React.MouseEvent) => {
+  const handleFav = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsAnimating(true);
+    setAnimating(true);
     onFavoriteToggle(pitch.id);
-    setTimeout(() => setIsAnimating(false), 300);
+    setTimeout(() => setAnimating(false), 300);
+  };
+
+  const isOpen = () => {
+    const h = new Date().getHours();
+    const open = parseInt(pitch.openTime?.split(':')[0] || '0');
+    const close = parseInt(pitch.closeTime?.split(':')[0] || '24');
+    return h >= open && h < close;
   };
 
   return (
     <div
       onClick={() => navigate(`/pitch/${pitch.id}`)}
-      className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 cursor-pointer hover:border-blue-500 transition-all hover:scale-[1.02]"
+      className="group bg-[#0d1526] rounded-lg overflow-hidden border border-white/5 cursor-pointer transition-all duration-150 active:scale-[0.97] hover:border-white/10"
     >
-      {/* Field Image Slider with Favorite Button */}
-      <div className="aspect-square bg-slate-800 relative overflow-hidden">
+      {/* Image */}
+      <div className="aspect-[4/3] bg-[#111827] relative overflow-hidden">
         <PitchCardSlider images={pitch.images} alt={pitch.name} />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
 
-        {/* Favorite Button */}
+        {/* Favorite */}
         <button
-          onClick={handleFavoriteClick}
-          className={`absolute top-2 right-2 p-2 rounded-full backdrop-blur-sm transition-all z-10 ${
-            isFavorite
-              ? 'bg-red-500/90 text-white'
-              : 'bg-black/40 text-white hover:bg-black/60'
-          } ${isAnimating ? 'scale-125' : 'scale-100'}`}
+          onClick={handleFav}
+          className={`absolute top-2 right-2 p-1.5 rounded-md backdrop-blur-sm transition-all z-10 ${
+            isFavorite ? 'bg-red-500 text-white' : 'bg-black/50 text-white/70 hover:bg-black/70'
+          } ${animating ? 'scale-125' : 'scale-100'}`}
         >
-          <Heart
-            className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`}
-          />
+          <Heart className={`w-3 h-3 ${isFavorite ? 'fill-current' : ''}`} />
         </button>
 
-        {/* Rating Badge - only show if rating exists */}
-        {rating !== undefined && (
-          <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-lg">
-            <Star className="w-3 h-3 text-yellow-400 fill-current" />
-            <span className="text-white text-xs font-semibold">{rating.toFixed(1)}</span>
+        {/* Rating */}
+        {rating !== undefined && rating > 0 && (
+          <div className="absolute top-2 left-2 flex items-center gap-0.5 px-1.5 py-0.5 bg-black/60 backdrop-blur-sm rounded">
+            <Star className="w-2.5 h-2.5 text-amber-400 fill-current" />
+            <span className="text-white text-[10px] font-bold">{rating.toFixed(1)}</span>
           </div>
         )}
 
-        {/* Distance Badge */}
-        {distance && (
-          <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-lg">
-            <span className="text-white text-xs font-semibold">{distance.toFixed(1)} km</span>
+        {/* Bottom badges */}
+        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+          {distance !== undefined ? (
+            <span className="text-white/70 text-[10px] bg-black/50 backdrop-blur-sm px-1.5 py-0.5 rounded">
+              {distance.toFixed(1)} km
+            </span>
+          ) : <span />}
+          <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded backdrop-blur-sm ${
+            isOpen() ? 'bg-green-500/25' : 'bg-red-500/25'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isOpen() ? 'bg-green-400' : 'bg-red-400'}`} />
+            <span className={`text-[9px] font-semibold ${isOpen() ? 'text-green-300' : 'text-red-300'}`}>
+              {isOpen() ? 'Ochiq' : 'Yopiq'}
+            </span>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Field Info */}
-      <div className="p-3">
-        <h3 className="text-sm font-semibold text-white mb-1 line-clamp-1">{pitch.name}</h3>
-        <div className="flex items-start text-slate-400 text-xs mb-2">
-          <MapPin className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" />
-          <span className="line-clamp-1">{pitch.address}, {pitch.city}</span>
+      {/* Info */}
+      <div className="p-2.5">
+        <h3 className="text-xs font-bold text-white mb-1 line-clamp-1">{pitch.name}</h3>
+        <div className="flex items-center text-slate-600 text-[10px] mb-1 gap-0.5">
+          <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+          <span className="line-clamp-1">{pitch.city}</span>
         </div>
-        <div className="flex flex-col gap-1">
-          <div className="text-lg font-bold text-blue-500">
-            {(pitch.pricePerHour / 1000).toFixed(0)}k
+        <div className="flex items-center text-slate-700 text-[10px] mb-2.5 gap-0.5">
+          <Clock className="w-2.5 h-2.5 flex-shrink-0" />
+          <span>{pitch.openTime?.slice(0,5)} – {pitch.closeTime?.slice(0,5)}</span>
+        </div>
+
+        {/* Price + CTA */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-blue-400 font-black text-sm">
+              {(pitch.pricePerHour / 1000).toFixed(0)}k
+            </span>
+            <span className="text-slate-700 text-[9px] ml-0.5">/soat</span>
           </div>
-          <button className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-            Batafsil
-          </button>
+          <div className="px-2 py-1 bg-blue-600/15 border border-blue-500/20 text-blue-400 text-[10px] font-bold rounded transition-colors group-hover:bg-blue-600/25">
+            Ko'rish
+          </div>
         </div>
       </div>
     </div>

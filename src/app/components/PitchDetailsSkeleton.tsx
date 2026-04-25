@@ -2,7 +2,7 @@ import { ArrowLeft } from 'lucide-react';
 
 export default function PitchDetailsSkeleton() {
   return (
-    <div className="min-h-screen bg-slate-950 pb-24">
+    <div className="min-h-screen bg-[#020817] pb-24">
       <div className="max-w-md mx-auto">
         {/* Image Slider Skeleton */}
         <div className="relative">

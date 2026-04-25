@@ -1,0 +1,26 @@
+{
+  "name": "MYBRON - Maydon Band Qilish",
+  "short_name": "MYBRON",
+  "description": "Sport maydonlarini oson va tez band qiling",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020817",
+  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/bronlogo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/bronlogo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["sports", "lifestyle"],
+  "lang": "uz"
+}

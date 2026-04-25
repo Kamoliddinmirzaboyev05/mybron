@@ -2,79 +2,68 @@
 @import './tailwind.css';
 @import './theme.css';
 
+/* Safe area for notched phones */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+
 /* Hide scrollbars for mobile-app feel */
 * {
   scrollbar-width: none;
   -ms-overflow-style: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-*::-webkit-scrollbar {
-  display: none;
-}
+*::-webkit-scrollbar { display: none; }
 
-/* Utility class */
-.scrollbar-hide {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
+.scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
 
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
+/* Safe area */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.h-safe-area-inset-bottom { height: env(safe-area-inset-bottom, 0px); }
+
+/* Smooth momentum scrolling on iOS */
+.scroll-smooth-ios {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
 }
 
 /* Animations */
 @keyframes slide-up {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
-
-.animate-slide-up {
-  animation: slide-up 0.3s ease-out;
-}
+.animate-slide-up { animation: slide-up 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
 
 @keyframes pulse-scale {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.05); }
 }
-
-.animate-pulse-scale {
-  animation: pulse-scale 0.3s ease-in-out;
-}
+.animate-pulse-scale { animation: pulse-scale 0.3s ease-in-out; }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-in forwards;
-}
+.animate-fadeIn { animation: fadeIn 0.3s ease-in forwards; }
 
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeInUp { animation: fadeInUp 0.4s ease-out forwards; }
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, #0d1526 25%, #1a2540 50%, #0d1526 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
 
-.animate-fadeInUp {
-  animation: fadeInUp 0.4s ease-out forwards;
-}
+/* Prevent text selection on buttons */
+button { user-select: none; -webkit-user-select: none; }

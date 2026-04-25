@@ -105,32 +105,29 @@ export default function BookingModal({
   const hasValidSelection = selectedSlots.length > 0;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center">
-      <div className="bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center">
+      <div className="bg-[#0d1526] w-full max-w-md rounded-t-2xl sm:rounded-xl max-h-[90vh] overflow-hidden flex flex-col animate-slide-up border border-white/10">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-800">
+        <div className="flex items-center justify-between p-5 border-b border-white/5">
           <div>
-            <h2 className="text-xl font-bold text-white">Band qilish</h2>
-            <p className="text-sm text-slate-400 mt-1">{pitch.name}</p>
+            <h2 className="text-lg font-black text-white">Band qilish</h2>
+            <p className="text-sm text-slate-500 mt-0.5">{pitch.name}</p>
           </div>
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="text-slate-400 hover:text-white transition-colors p-2 hover:bg-slate-800 rounded-full disabled:opacity-50"
+            className="text-slate-500 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-lg disabled:opacity-50"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Date Picker */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
           <DatePicker selectedDate={selectedDate} onDateChange={handleDateChange} />
-
-          {/* Time Slot Picker */}
           {loading ? (
             <div className="text-center py-8">
-              <div className="text-slate-400">Yuklanmoqda...</div>
+              <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
             </div>
           ) : (
             <TimeSlotPicker
@@ -144,17 +141,30 @@ export default function BookingModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-slate-800 bg-slate-900">
+        <div className="p-5 border-t border-white/5">
+          {hasValidSelection && (
+            <div className="flex items-center justify-between mb-3 px-1">
+              <span className="text-slate-500 text-sm">{selectedSlots.length} soat</span>
+              <span className="text-blue-400 font-black text-lg">
+                {(pitch.pricePerHour * selectedSlots.length).toLocaleString()} so'm
+              </span>
+            </div>
+          )}
           <button
             onClick={handleConfirm}
             disabled={!hasValidSelection || isSubmitting || loading || selectedSlotIds.length === 0}
-            className={`w-full py-4 rounded-xl font-semibold transition-colors ${
+            className={`w-full py-3.5 rounded-lg font-bold transition-all active:scale-[0.98] ${
               hasValidSelection && !isSubmitting && !loading && selectedSlotIds.length > 0
-                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                : 'bg-white/5 text-slate-600 cursor-not-allowed'
             }`}
           >
-            {isSubmitting ? 'Yuklanmoqda...' : hasValidSelection ? `${selectedSlots.length} soat band qilish` : 'Vaqt tanlang'}
+            {isSubmitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Yuklanmoqda...
+              </span>
+            ) : hasValidSelection ? `${selectedSlots.length} soat band qilish` : 'Vaqt tanlang'}
           </button>
         </div>
       </div>
