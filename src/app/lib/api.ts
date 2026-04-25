@@ -269,17 +269,54 @@ class ApiClient {
     return normalized;
   }
 
-  // Field/Pitch methods (mock — will connect to real API later)
+  // Field/Pitch methods (real API)
   async getFields(): Promise<Pitch[]> {
-    await delay();
-    return MOCK_PITCHES;
+    const res = await this.request<any>('/fields/');
+    return (res.results || []).map((f: any) => this.normalizeField(f));
   }
 
   async getFieldById(id: string): Promise<Pitch> {
-    await delay();
-    const pitch = MOCK_PITCHES.find(p => p.id === id);
-    if (!pitch) throw new Error('Maydon topilmadi');
-    return pitch;
+    const res = await this.request<any>(`/fields/${id}/`);
+    return this.normalizeField(res);
+  }
+
+  private normalizeField(apiField: any): Pitch {
+    const images: string[] = [];
+    if (apiField.cover_image_url) images.push(apiField.cover_image_url);
+
+    // Parse location_url for lat/lng if it's a Google Maps URL
+    let lat: number | null = null;
+    let lng: number | null = null;
+    if (apiField.location_url) {
+      const match = apiField.location_url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (match) {
+        lat = parseFloat(match[1]);
+        lng = parseFloat(match[2]);
+      }
+    }
+
+    return {
+      id: String(apiField.id),
+      userId: String(apiField.owner || apiField.user_id || ''),
+      name: apiField.name,
+      address: apiField.address || '',
+      city: apiField.city || '',
+      lat,
+      lng,
+      pricePerHour: parseFloat(apiField.price_per_hour) || 0,
+      size: apiField.size || '',
+      surface: apiField.surface || '',
+      description: apiField.description || '',
+      amenities: apiField.amenities || [],
+      images,
+      openTime: (apiField.opening_time || '08:00:00').slice(0, 5),
+      closeTime: (apiField.closing_time || '23:00:00').slice(0, 5),
+      phone: apiField.phone || '',
+      isActive: apiField.is_active ?? true,
+      rating: apiField.rating || 0,
+      reviewCount: apiField.review_count || 0,
+      createdAt: apiField.created_at || new Date().toISOString(),
+    };
   }
 
   // Booking methods (mock)

@@ -12,7 +12,7 @@ import PitchImageSlider from '../components/PitchImageSlider';
 import BookingModal from '../components/BookingModal';
 import ReviewsSection from '../components/ReviewsSection';
 import PitchDetailsSkeleton from '../components/PitchDetailsSkeleton';
-import { api } from '../lib/api';
+import { api, Pitch } from '../lib/api';
 import { toast } from 'sonner';
 import { notifyBookingCreated } from '../lib/notifications';
 

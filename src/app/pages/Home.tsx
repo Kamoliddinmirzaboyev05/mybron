@@ -8,21 +8,13 @@ import QuickFilters from '../components/QuickFilters';
 import { useNavigate } from 'react-router';
 import { getUserLocation, calculateDistance, Coordinates } from '../lib/geoUtils';
 import { MapPin, Users, Star, Zap, Download, X } from 'lucide-react';
-import { api } from '../lib/api';
+import { api, Pitch } from '../lib/api';
 import { toast } from 'sonner';
-
-interface Field {
-  id: string; userId: string; name: string; address: string; city: string;
-  lat: number | null; lng: number | null; pricePerHour: number; size: string;
-  surface: string; description: string; amenities: string[]; images: string[];
-  openTime: string; closeTime: string; phone: string; isActive: boolean;
-  rating: number; reviewCount: number; createdAt: string;
-}
 
 export default function Home() {
   const { user } = useAuth();
-  const [fields, setFields] = useState<Field[]>([]);
-  const [filteredFields, setFilteredFields] = useState<Field[]>([]);
+  const [fields, setFields] = useState<Pitch[]>([]);
+  const [filteredFields, setFilteredFields] = useState<Pitch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
