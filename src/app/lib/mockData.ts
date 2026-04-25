@@ -6,6 +6,9 @@ import type { User, Pitch, Booking, Review, FieldSlot, FieldSlotsResponse } from
 
 export const MOCK_USER: User = {
   id: 'user-1',
+  username: 'ali_valiyev',
+  first_name: 'Ali',
+  last_name: 'Valiyev',
   fullName: 'Ali Valiyev',
   login: 'ali_valiyev',
   role: 'user',
@@ -14,6 +17,9 @@ export const MOCK_USER: User = {
 
 export const MOCK_ADMIN: User = {
   id: 'admin-1',
+  username: 'admin',
+  first_name: 'Admin',
+  last_name: 'Adminov',
   fullName: 'Admin Adminov',
   login: 'admin',
   role: 'admin',

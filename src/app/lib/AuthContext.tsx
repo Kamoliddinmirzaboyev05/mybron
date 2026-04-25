@@ -1,11 +1,18 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { api, User, AuthResponse } from './api';
+import { api, User } from './api';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (login: string, password: string) => Promise<{ error: any }>;
-  signUp: (fullName: string, login: string, phone: string, password: string) => Promise<{ error: any }>;
+  signUp: (data: {
+    first_name: string;
+    last_name: string;
+    login: string;
+    phone: string;
+    password: string;
+    password2: string;
+  }) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -16,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in (mock: read from localStorage)
+    // Check if user is already logged in (read from localStorage)
     const token = api.getToken();
     if (token) {
       const stored = api.getUser();
@@ -28,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (login: string, password: string) => {
     try {
       const response = await api.login({ login, password });
-      api.setToken(response.token);
+      api.setTokens(response.access, response.refresh);
       api.setUser(response.user);
       setUser(response.user);
       return { error: null };
@@ -37,10 +44,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (fullName: string, login: string, phone: string, password: string) => {
+  const signUp = async (data: {
+    first_name: string;
+    last_name: string;
+    login: string;
+    phone: string;
+    password: string;
+    password2: string;
+  }) => {
     try {
-      const response = await api.register({ fullName, login, phone, password, role: 'user' });
-      api.setToken(response.token);
+      const response = await api.register({ ...data, role: 'user' });
+      api.setTokens(response.access, response.refresh);
       api.setUser(response.user);
       setUser(response.user);
       return { error: null };

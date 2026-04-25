@@ -109,7 +109,7 @@ export default function Login() {
           {/* Hint */}
           <div className="mt-4 p-3 rounded-lg bg-white/3 border border-white/5 text-center">
             <p className="text-slate-600 text-xs">
-              Test: <span className="text-slate-400">admin</span> yoki <span className="text-slate-400">ali_valiyev</span> / istalgan parol
+              Test: <span className="text-slate-400">mirzaboyev</span> / <span className="text-slate-400">kamoliddin</span>
             </p>
           </div>
 

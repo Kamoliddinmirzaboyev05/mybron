@@ -1,5 +1,5 @@
 // ============================================================
-// API - Hozircha mock data ishlatilmoqda (backend yangilanmoqda)
+// API - Backend integration (auth connected to real API)
 // ============================================================
 
 import {
@@ -14,28 +14,38 @@ import {
   generateMockSlots,
 } from './mockData';
 
-// Simulate network delay
+const BASE_URL = 'http://127.0.0.1:8000/api';
+
+// Simulate network delay for mock endpoints
 const delay = (ms = 400) => new Promise(res => setTimeout(res, ms));
 
 // Types
 export interface User {
   id: string;
+  username: string;
+  first_name: string;
+  last_name: string;
   fullName: string;
   login: string;
   role: 'user' | 'admin';
   phone?: string;
+  avatar_url?: string | null;
+  date_joined?: string;
 }
 
 export interface AuthResponse {
   user: User;
-  token: string;
+  access: string;
+  refresh: string;
 }
 
 export interface RegisterData {
-  fullName: string;
+  first_name: string;
+  last_name: string;
   login: string;
   phone: string;
   password: string;
+  password2: string;
   role?: 'user';
 }
 
@@ -125,64 +135,141 @@ let mockReviews: Record<string, Review[]> = {
 };
 let mockMyReviews = [...MOCK_MY_REVIEWS];
 
-// API Client (mock mode)
+// API Client
 class ApiClient {
-  private token: string | null = null;
+  private accessToken: string | null = null;
+  private refreshToken: string | null = null;
 
-  setToken(token: string) {
-    this.token = token;
-    localStorage.setItem('token', token);
+  constructor() {
+    this.accessToken = localStorage.getItem('access_token');
+    this.refreshToken = localStorage.getItem('refresh_token');
+  }
+
+  setTokens(access: string, refresh: string) {
+    this.accessToken = access;
+    this.refreshToken = refresh;
+    localStorage.setItem('access_token', access);
+    localStorage.setItem('refresh_token', refresh);
   }
 
   getToken(): string | null {
-    if (!this.token) {
-      this.token = localStorage.getItem('token');
-    }
-    return this.token;
+    return this.accessToken;
   }
 
-  clearToken() {
-    this.token = null;
-    localStorage.removeItem('token');
+  clearTokens() {
+    this.accessToken = null;
+    this.refreshToken = null;
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
   }
 
-  // Auth methods
-  async register(data: RegisterData): Promise<AuthResponse> {
-    await delay();
-    const user: User = {
-      id: `user-${Date.now()}`,
-      fullName: data.fullName,
-      login: data.login,
-      role: 'user',
-      phone: data.phone,
+  private async request<T>(endpoint: string, options: RequestInit = {}, retry = true): Promise<T> {
+    const url = `${BASE_URL}${endpoint}`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string> || {}),
     };
-    this.setToken('mock-token-' + user.id);
+
+    if (this.accessToken) {
+      headers['Authorization'] = `Bearer ${this.accessToken}`;
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (!response.ok) {
+      if (response.status === 401 && retry && this.refreshToken) {
+        try {
+          await this.refreshAccessToken();
+          return this.request<T>(endpoint, options, false);
+        } catch {
+          this.clearTokens();
+          window.location.href = '/login';
+          throw new Error('Sessiya tugadi. Iltimos, qayta kiring.');
+        }
+      }
+      const errorData = await response.json().catch(() => ({}));
+      const errorMsg = errorData.detail || errorData.message || Object.values(errorData).flat().join(', ') || `Xatolik: ${response.status}`;
+      throw new Error(errorMsg);
+    }
+
+    return response.json();
+  }
+
+  async refreshAccessToken(): Promise<void> {
+    if (!this.refreshToken) throw new Error('No refresh token');
+    const res = await fetch(`${BASE_URL}/auth/token/refresh/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh: this.refreshToken }),
+    });
+    if (!res.ok) throw new Error('Refresh failed');
+    const data = await res.json();
+    this.accessToken = data.access;
+    localStorage.setItem('access_token', data.access);
+  }
+
+  private normalizeUser(data: any): User {
+    return {
+      ...data,
+      id: String(data.id),
+      fullName: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
+      login: data.username,
+    };
+  }
+
+  // Auth methods (real API)
+  async register(data: RegisterData): Promise<AuthResponse> {
+    const res = await this.request<any>('/auth/register/', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: data.login,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        phone: data.phone,
+        password: data.password,
+        password2: data.password2,
+        role: data.role || 'user',
+      }),
+    });
+    const user = this.normalizeUser(res.user);
+    this.setTokens(res.access, res.refresh);
     this.setUser(user);
-    return { user, token: 'mock-token-' + user.id };
+    return { user, access: res.access, refresh: res.refresh };
   }
 
   async login(data: LoginData): Promise<AuthResponse> {
-    await delay();
-    // admin / user login
-    const user = data.login === 'admin' ? MOCK_ADMIN : MOCK_USER;
-    this.setToken('mock-token-' + user.id);
+    const res = await this.request<any>('/auth/login/', {
+      method: 'POST',
+      body: JSON.stringify({ username: data.login, password: data.password }),
+    });
+    const user = this.normalizeUser(res.user);
+    this.setTokens(res.access, res.refresh);
     this.setUser(user);
-    return { user, token: 'mock-token-' + user.id };
+    return { user, access: res.access, refresh: res.refresh };
   }
 
   async logout(): Promise<void> {
-    this.clearToken();
+    try {
+      await this.request('/auth/logout/', {
+        method: 'POST',
+        body: JSON.stringify({ refresh: this.refreshToken }),
+      });
+    } catch {}
+    this.clearTokens();
   }
 
   async getProfile(): Promise<User> {
-    await delay(200);
-    const stored = this.getUser();
-    if (!stored) throw new Error('Not authenticated');
-    return stored;
+    const user = await this.request<any>('/auth/profile/');
+    const normalized = this.normalizeUser(user);
+    this.setUser(normalized);
+    return normalized;
   }
 
-  // Field/Pitch methods
+  // Field/Pitch methods (mock — will connect to real API later)
   async getFields(): Promise<Pitch[]> {
     await delay();
     return MOCK_PITCHES;
@@ -195,7 +282,7 @@ class ApiClient {
     return pitch;
   }
 
-  // Booking methods
+  // Booking methods (mock)
   async getBookings(_userId: string): Promise<Booking[]> {
     await delay();
     return mockBookings;
@@ -287,7 +374,7 @@ class ApiClient {
     );
   }
 
-  // Admin methods
+  // Admin methods (mock)
   async getAdminBookings(_status?: string): Promise<Booking[]> {
     await delay();
     return mockBookings;
@@ -303,7 +390,7 @@ class ApiClient {
     return MOCK_ADMIN_STATS;
   }
 
-  // Favorite methods
+  // Favorite methods (mock)
   async getFavorites(): Promise<{ id: string; fieldId: string }[]> {
     await delay(200);
     return mockFavorites;
@@ -321,7 +408,7 @@ class ApiClient {
     mockFavorites = mockFavorites.filter(f => f.fieldId !== fieldId);
   }
 
-  // Review methods
+  // Review methods (mock)
   async getReviews(fieldId: string): Promise<Review[]> {
     await delay();
     return mockReviews[fieldId] || [];
