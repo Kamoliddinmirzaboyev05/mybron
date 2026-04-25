@@ -29,11 +29,7 @@ export default function Profile() {
 
   const fetchProfile = async () => {
     try {
-      const profile = await api.getProfile();
-      setUser(profile);
-    } catch (err) {
-      console.error('Exception while fetching profile:', err);
-      // Fallback to authUser if profile fetch fails
+      // Mock: authUser dan foydalaniladi
       setUser(authUser);
     } finally {
       setLoading(false);

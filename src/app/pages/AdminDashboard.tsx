@@ -59,7 +59,13 @@ export default function AdminDashboard() {
       fetchDashboardData();
     } catch (err) {
       console.error('Exception checking admin access:', err);
-      navigate('/');
+      // Fallback: use authUser
+      if (authUser?.role !== 'admin') {
+        navigate('/');
+        return;
+      }
+      setProfile(authUser);
+      fetchDashboardData();
     }
   };
 

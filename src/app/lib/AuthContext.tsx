@@ -16,26 +16,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in
+    // Check if user is already logged in (mock: read from localStorage)
     const token = api.getToken();
-    
     if (token) {
-      // Always try to get the latest profile if we have a token
-      api.getProfile()
-        .then(profile => {
-          setUser(profile);
-          api.setUser(profile); // Update stored user just in case
-          setLoading(false);
-        })
-        .catch(() => {
-          // Token is invalid, clear it
-          api.clearToken();
-          setUser(null);
-          setLoading(false);
-        });
-    } else {
-      setLoading(false);
+      const stored = api.getUser();
+      setUser(stored);
     }
+    setLoading(false);
   }, []);
 
   const signIn = async (login: string, password: string) => {
