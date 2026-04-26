@@ -1,18 +1,11 @@
 import { useState } from 'react';
-import { MapPin, Heart, Star, Clock } from 'lucide-react';
+import { MapPin, Heart, Star, Clock, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import PitchCardSlider from './PitchCardSlider';
-
-interface Field {
-  id: string; name: string; address: string; city: string;
-  lat: number | null; lng: number | null; pricePerHour: number;
-  size: string; surface: string; amenities: string[]; images: string[];
-  openTime: string; closeTime: string; rating: number; reviewCount: number;
-  isActive: boolean; userId: string; description: string; phone: string; createdAt: string;
-}
+import type { Pitch } from '../lib/api';
 
 interface Props {
-  pitch: Field;
+  pitch: Pitch;
   isFavorite: boolean;
   onFavoriteToggle: (id: string) => void;
   distance?: number;
@@ -37,10 +30,38 @@ export default function EnhancedPitchCard({ pitch, isFavorite, onFavoriteToggle,
     return h >= open && h < close;
   };
 
+  const formatPrice = () => {
+    if (!pitch.pricePerHour || pitch.pricePerHour === 0) {
+      return <span className="text-emerald-400 font-black text-sm">Bepul</span>;
+    }
+    if (pitch.pricePerHour >= 1000) {
+      return (
+        <>
+          <span className="text-blue-400 font-black text-sm">
+            {(pitch.pricePerHour / 1000).toFixed(0)}k
+          </span>
+          <span className="text-slate-700 text-[9px] ml-0.5">/soat</span>
+        </>
+      );
+    }
+    return (
+      <>
+        <span className="text-blue-400 font-black text-sm">
+          {pitch.pricePerHour.toLocaleString()}
+        </span>
+        <span className="text-slate-700 text-[9px] ml-0.5">/soat</span>
+      </>
+    );
+  };
+
+  const displayCity = pitch.city && pitch.city !== 'Shahar kiritilmagan' ? pitch.city : null;
+  const displayAddress = pitch.address && pitch.address !== 'Manzil kiritilmagan' ? pitch.address : null;
+  const locationText = displayCity || displayAddress || 'Manzil ko\'rsatilmagan';
+
   return (
     <div
       onClick={() => navigate(`/pitch/${pitch.id}`)}
-      className="group bg-[#0d1526] rounded-lg overflow-hidden border border-white/5 cursor-pointer transition-all duration-150 active:scale-[0.97] hover:border-white/10"
+      className="group bg-[#0d1526] rounded-xl overflow-hidden border border-white/5 cursor-pointer transition-all duration-150 active:scale-[0.97] hover:border-white/10 hover:shadow-lg hover:shadow-black/20"
     >
       {/* Image */}
       <div className="aspect-[4/3] bg-[#111827] relative overflow-hidden">
@@ -75,7 +96,7 @@ export default function EnhancedPitchCard({ pitch, isFavorite, onFavoriteToggle,
           <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded backdrop-blur-sm ${
             isOpen() ? 'bg-green-500/25' : 'bg-red-500/25'
           }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isOpen() ? 'bg-green-400' : 'bg-red-400'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${isOpen() ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
             <span className={`text-[9px] font-semibold ${isOpen() ? 'text-green-300' : 'text-red-300'}`}>
               {isOpen() ? 'Ochiq' : 'Yopiq'}
             </span>
@@ -85,24 +106,27 @@ export default function EnhancedPitchCard({ pitch, isFavorite, onFavoriteToggle,
 
       {/* Info */}
       <div className="p-2.5">
-        <h3 className="text-xs font-bold text-white mb-1 line-clamp-1">{pitch.name}</h3>
-        <div className="flex items-center text-slate-600 text-[10px] mb-1 gap-0.5">
-          <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
-          <span className="line-clamp-1">{pitch.city}</span>
+        <h3 className="text-xs font-bold text-white mb-1.5 line-clamp-1 leading-tight">{pitch.name}</h3>
+
+        <div className="flex items-center text-slate-500 text-[10px] mb-1 gap-0.5">
+          <MapPin className="w-2.5 h-2.5 flex-shrink-0 text-slate-600" />
+          <span className="line-clamp-1">{locationText}</span>
         </div>
-        <div className="flex items-center text-slate-700 text-[10px] mb-2.5 gap-0.5">
+
+        <div className="flex items-center text-slate-600 text-[10px] mb-2.5 gap-0.5">
           <Clock className="w-2.5 h-2.5 flex-shrink-0" />
-          <span>{pitch.openTime?.slice(0,5)} – {pitch.closeTime?.slice(0,5)}</span>
+          <span>{pitch.openTime?.slice(0, 5)} – {pitch.closeTime?.slice(0, 5)}</span>
+          {pitch.phone && (
+            <>
+              <span className="mx-1 text-slate-700">·</span>
+              <Phone className="w-2.5 h-2.5 flex-shrink-0" />
+            </>
+          )}
         </div>
 
         {/* Price + CTA */}
         <div className="flex items-center justify-between">
-          <div>
-            <span className="text-blue-400 font-black text-sm">
-              {(pitch.pricePerHour / 1000).toFixed(0)}k
-            </span>
-            <span className="text-slate-700 text-[9px] ml-0.5">/soat</span>
-          </div>
+          <div>{formatPrice()}</div>
           <div className="px-2 py-1 bg-blue-600/15 border border-blue-500/20 text-blue-400 text-[10px] font-bold rounded transition-colors group-hover:bg-blue-600/25">
             Ko'rish
           </div>

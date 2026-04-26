@@ -11,8 +11,12 @@ interface PitchCardSliderProps {
 export default function PitchCardSlider({ images, alt }: PitchCardSliderProps) {
   if (!images || images.length === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-slate-600">
-        No Image
+      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#0d1526] to-[#111827]">
+        <svg className="w-10 h-10 text-slate-700 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 2a10 10 0 0 1 0 20M2 12h20M12 2c-2.5 3-4 6-4 10s1.5 7 4 10M12 2c2.5 3 4 6 4 10s-1.5 7-4 10" />
+        </svg>
+        <span className="text-slate-700 text-[10px]">Rasm yo'q</span>
       </div>
     );
   }

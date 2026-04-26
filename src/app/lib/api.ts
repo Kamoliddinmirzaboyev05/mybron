@@ -1,23 +1,8 @@
 // ============================================================
-// API - Backend integration (auth connected to real API)
+// API - Backend integration
 // ============================================================
 
-import {
-  MOCK_USER,
-  MOCK_ADMIN,
-  MOCK_PITCHES,
-  MOCK_BOOKINGS,
-  MOCK_REVIEWS,
-  MOCK_MY_REVIEWS,
-  MOCK_FAVORITES,
-  MOCK_ADMIN_STATS,
-  generateMockSlots,
-} from './mockData';
-
-const BASE_URL = 'http://127.0.0.1:8000/api';
-
-// Simulate network delay for mock endpoints
-const delay = (ms = 400) => new Promise(res => setTimeout(res, ms));
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://103.6.169.242/api';
 
 // Types
 export interface User {
@@ -72,6 +57,9 @@ export interface Pitch {
   closeTime: string;
   phone: string;
   isActive: boolean;
+  subscriptionValid: boolean;
+  advanceBookingDays: number;
+  imagesCount: number;
   rating: number;
   reviewCount: number;
   createdAt: string;
@@ -111,29 +99,18 @@ export interface Review {
 
 export interface FieldSlot {
   id: string;
+  fieldId: string;
+  date: string;
   startTime: string;
   endTime: string;
+  isActive: boolean;
+  isBooked: boolean;
   isAvailable: boolean;
 }
 
 export interface FieldSlotsResponse {
-  dates: {
-    date: string;
-    dayLabel: string;
-    slots: FieldSlot[];
-  }[];
+  slots: FieldSlot[];
 }
-
-// In-memory mock state (resets on page refresh — intentional for dev)
-let mockFavorites = [...MOCK_FAVORITES];
-let mockBookings = [...MOCK_BOOKINGS];
-let mockReviews: Record<string, Review[]> = {
-  'pitch-1': [...(MOCK_REVIEWS['pitch-1'] || [])],
-  'pitch-2': [...(MOCK_REVIEWS['pitch-2'] || [])],
-  'pitch-3': [...(MOCK_REVIEWS['pitch-3'] || [])],
-  'pitch-4': [...(MOCK_REVIEWS['pitch-4'] || [])],
-};
-let mockMyReviews = [...MOCK_MY_REVIEWS];
 
 // API Client
 class ApiClient {
@@ -313,16 +290,39 @@ class ApiClient {
       closeTime: (apiField.closing_time || '23:00:00').slice(0, 5),
       phone: apiField.phone || '',
       isActive: apiField.is_active ?? true,
+      subscriptionValid: apiField.subscription_valid ?? true,
+      advanceBookingDays: apiField.advance_booking_days ?? 1,
+      imagesCount: apiField.images_count ?? 0,
       rating: apiField.rating || 0,
       reviewCount: apiField.review_count || 0,
       createdAt: apiField.created_at || new Date().toISOString(),
     };
   }
 
-  // Booking methods (mock)
-  async getBookings(_userId: string): Promise<Booking[]> {
-    await delay();
-    return mockBookings;
+  // Slot methods (real API)
+  async getFieldSlots(fieldId: string, dateStr: string): Promise<FieldSlotsResponse> {
+    const res = await this.request<any[]>(`/admin/fields/${fieldId}/slots/?date=${dateStr}`);
+    const slots = res.map((slot: any) => this.normalizeSlot(slot));
+    return { slots };
+  }
+
+  private normalizeSlot(apiSlot: any): FieldSlot {
+    return {
+      id: String(apiSlot.id),
+      fieldId: String(apiSlot.field),
+      date: apiSlot.date,
+      startTime: (apiSlot.start_time || '').slice(0, 5),
+      endTime: (apiSlot.end_time || '').slice(0, 5),
+      isActive: apiSlot.is_active ?? true,
+      isBooked: apiSlot.is_booked ?? false,
+      isAvailable: (apiSlot.is_active && !apiSlot.is_booked) ?? true,
+    };
+  }
+
+  // Booking methods (real API)
+  async getBookings(userId: string): Promise<Booking[]> {
+    const res = await this.request<any>(`/bookings/?user=${userId}`);
+    return (res.results || []).map((b: any) => this.normalizeBooking(b));
   }
 
   async createBooking(bookingData: {
@@ -333,26 +333,18 @@ class ApiClient {
     totalPrice: number;
     note?: string;
   }): Promise<Booking> {
-    await delay();
-    const field = MOCK_PITCHES.find(p => p.id === bookingData.fieldId);
-    const newBooking: Booking = {
-      id: `booking-${Date.now()}`,
-      userId: 'user-1',
-      fieldId: bookingData.fieldId,
-      bookingDate: bookingData.bookingDate,
-      startTime: bookingData.startTime,
-      endTime: bookingData.endTime,
-      totalPrice: bookingData.totalPrice,
-      status: 'pending',
-      paymentMethod: 'cash',
-      clientName: MOCK_USER.fullName,
-      clientPhone: MOCK_USER.phone,
-      note: bookingData.note || null,
-      createdAt: new Date().toISOString(),
-      field,
-    };
-    mockBookings = [newBooking, ...mockBookings];
-    return newBooking;
+    const res = await this.request<any>('/bookings/', {
+      method: 'POST',
+      body: JSON.stringify({
+        field: bookingData.fieldId,
+        booking_date: bookingData.bookingDate,
+        start_time: bookingData.startTime,
+        end_time: bookingData.endTime,
+        total_price: bookingData.totalPrice,
+        note: bookingData.note || '',
+      }),
+    });
+    return this.normalizeBooking(res);
   }
 
   async bookSlot(slotData: {
@@ -362,98 +354,116 @@ class ApiClient {
     startTime: string;
     endTime: string;
   }): Promise<Booking> {
-    await delay();
-    const field = MOCK_PITCHES.find(p => p.id === slotData.fieldId);
-    const hours =
-      parseInt(slotData.endTime.split(':')[0]) -
-      parseInt(slotData.startTime.split(':')[0]);
-    const totalPrice = (field?.pricePerHour || 0) * hours;
-
-    const newBooking: Booking = {
-      id: `booking-${Date.now()}`,
-      userId: 'user-1',
-      fieldId: slotData.fieldId,
-      bookingDate: slotData.date,
-      startTime: slotData.startTime,
-      endTime: slotData.endTime,
-      totalPrice,
-      status: 'pending',
-      paymentMethod: 'cash',
-      clientName: MOCK_USER.fullName,
-      clientPhone: MOCK_USER.phone,
-      note: null,
-      createdAt: new Date().toISOString(),
-      field,
-    };
-    mockBookings = [newBooking, ...mockBookings];
-    return newBooking;
-  }
-
-  async getFieldSlots(pitchId: string, dateStr: string): Promise<FieldSlotsResponse> {
-    await delay();
-    return generateMockSlots(pitchId, dateStr);
+    const res = await this.request<any>('/bookings/', {
+      method: 'POST',
+      body: JSON.stringify({
+        field: slotData.fieldId,
+        booking_date: slotData.date,
+        start_time: slotData.startTime,
+        end_time: slotData.endTime,
+        slot: slotData.slotId,
+      }),
+    });
+    return this.normalizeBooking(res);
   }
 
   async updateBookingStatus(bookingId: string, status: string): Promise<Booking> {
-    await delay();
-    mockBookings = mockBookings.map(b =>
-      b.id === bookingId ? { ...b, status: status as Booking['status'] } : b
-    );
-    const updated = mockBookings.find(b => b.id === bookingId);
-    if (!updated) throw new Error('Bron topilmadi');
-    return updated;
+    const res = await this.request<any>(`/bookings/${bookingId}/`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+    return this.normalizeBooking(res);
   }
 
   async cancelBooking(bookingId: string): Promise<void> {
-    await delay();
-    mockBookings = mockBookings.map(b =>
-      b.id === bookingId ? { ...b, status: 'cancelled' as const } : b
-    );
+    await this.request(`/bookings/${bookingId}/`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'cancelled' }),
+    });
   }
 
-  // Admin methods (mock)
-  async getAdminBookings(_status?: string): Promise<Booking[]> {
-    await delay();
-    return mockBookings;
+  private normalizeBooking(apiBooking: any): Booking {
+    return {
+      id: String(apiBooking.id),
+      userId: String(apiBooking.user || apiBooking.user_id || ''),
+      fieldId: String(apiBooking.field || apiBooking.field_id || ''),
+      bookingDate: apiBooking.booking_date || apiBooking.date || '',
+      startTime: (apiBooking.start_time || '').slice(0, 5),
+      endTime: (apiBooking.end_time || '').slice(0, 5),
+      totalPrice: parseFloat(apiBooking.total_price) || 0,
+      status: apiBooking.status || 'pending',
+      paymentMethod: apiBooking.payment_method || 'cash',
+      clientName: apiBooking.client_name || null,
+      clientPhone: apiBooking.client_phone || null,
+      note: apiBooking.note || null,
+      createdAt: apiBooking.created_at || new Date().toISOString(),
+      confirmedAt: apiBooking.confirmed_at || null,
+      rejectedAt: apiBooking.rejected_at || null,
+      rejectReason: apiBooking.reject_reason || null,
+      field: apiBooking.field_details ? this.normalizeField(apiBooking.field_details) : undefined,
+    };
   }
 
-  async getAllBookings(_status?: string): Promise<Booking[]> {
-    await delay();
-    return mockBookings;
+  // Admin methods (real API)
+  async getAdminBookings(status?: string): Promise<Booking[]> {
+    const endpoint = status ? `/admin/bookings/?status=${status}` : '/admin/bookings/';
+    const res = await this.request<any>(endpoint);
+    return (res.results || []).map((b: any) => this.normalizeBooking(b));
+  }
+
+  async getAllBookings(status?: string): Promise<Booking[]> {
+    return this.getAdminBookings(status);
   }
 
   async getAdminStats(): Promise<{ todayRevenue: number; totalRevenue: number; balance: number }> {
-    await delay();
-    return MOCK_ADMIN_STATS;
+    const res = await this.request<any>('/admin/stats/');
+    return {
+      todayRevenue: parseFloat(res.today_revenue) || 0,
+      totalRevenue: parseFloat(res.total_revenue) || 0,
+      balance: parseFloat(res.balance) || 0,
+    };
   }
 
-  // Favorite methods (mock)
+  // Favorite methods (real API)
   async getFavorites(): Promise<{ id: string; fieldId: string }[]> {
-    await delay(200);
-    return mockFavorites;
+    const res = await this.request<any>('/favorites/');
+    return (res.results || []).map((f: any) => ({
+      id: String(f.id),
+      fieldId: String(f.field || f.field_id),
+    }));
   }
 
   async addFavorite(fieldId: string): Promise<{ id: string; fieldId: string }> {
-    await delay(200);
-    const fav = { id: `fav-${Date.now()}`, fieldId };
-    mockFavorites = [...mockFavorites, fav];
-    return fav;
+    const res = await this.request<any>('/favorites/', {
+      method: 'POST',
+      body: JSON.stringify({ field: fieldId }),
+    });
+    return {
+      id: String(res.id),
+      fieldId: String(res.field || res.field_id),
+    };
   }
 
   async removeFavorite(fieldId: string): Promise<void> {
-    await delay(200);
-    mockFavorites = mockFavorites.filter(f => f.fieldId !== fieldId);
+    // Find favorite by fieldId first
+    const favorites = await this.getFavorites();
+    const favorite = favorites.find(f => f.fieldId === fieldId);
+    if (favorite) {
+      await this.request(`/favorites/${favorite.id}/`, {
+        method: 'DELETE',
+      });
+    }
   }
 
-  // Review methods (mock)
+  // Review methods (real API)
   async getReviews(fieldId: string): Promise<Review[]> {
-    await delay();
-    return mockReviews[fieldId] || [];
+    const res = await this.request<any>(`/reviews/?field=${fieldId}`);
+    return (res.results || []).map((r: any) => this.normalizeReview(r));
   }
 
   async getMyReviews(): Promise<Review[]> {
-    await delay();
-    return mockMyReviews;
+    const res = await this.request<any>('/reviews/my/');
+    return (res.results || []).map((r: any) => this.normalizeReview(r));
   }
 
   async submitReview(reviewData: {
@@ -461,22 +471,29 @@ class ApiClient {
     rating: number;
     comment: string;
   }): Promise<Review> {
-    await delay();
-    const newReview: Review = {
-      id: `review-${Date.now()}`,
-      fieldId: reviewData.fieldId,
-      userId: 'user-1',
-      rating: reviewData.rating,
-      comment: reviewData.comment,
-      createdAt: new Date().toISOString(),
-      user: { fullName: MOCK_USER.fullName },
+    const res = await this.request<any>('/reviews/', {
+      method: 'POST',
+      body: JSON.stringify({
+        field: reviewData.fieldId,
+        rating: reviewData.rating,
+        comment: reviewData.comment,
+      }),
+    });
+    return this.normalizeReview(res);
+  }
+
+  private normalizeReview(apiReview: any): Review {
+    return {
+      id: String(apiReview.id),
+      fieldId: String(apiReview.field || apiReview.field_id),
+      userId: String(apiReview.user || apiReview.user_id),
+      rating: apiReview.rating || 0,
+      comment: apiReview.comment || '',
+      createdAt: apiReview.created_at || new Date().toISOString(),
+      user: apiReview.user_details ? {
+        fullName: `${apiReview.user_details.first_name || ''} ${apiReview.user_details.last_name || ''}`.trim(),
+      } : undefined,
     };
-    mockReviews[reviewData.fieldId] = [
-      newReview,
-      ...(mockReviews[reviewData.fieldId] || []),
-    ];
-    mockMyReviews = [newReview, ...mockMyReviews];
-    return newReview;
   }
 
   // Utility methods

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useAuth } from '../lib/AuthContext';
-import { toDateString, filterPastSlots } from '../lib/dateUtils';
+import { toDateString } from '../lib/dateUtils';
 import { formatPhoneNumber } from '../lib/phoneFormatter';
 import { 
   ArrowLeft, MapPin, Droplets, Car, Wifi, Coffee, Moon, 
@@ -44,34 +44,11 @@ const getAmenityIcon = (amenity: string) => {
   return <Zap className="w-4 h-4 text-blue-500" />;
 };
 
-interface Field {
-  id: string;
-  userId: string;
-  name: string;
-  address: string;
-  city: string;
-  lat: number | null;
-  lng: number | null;
-  pricePerHour: number;
-  size: string;
-  surface: string;
-  description: string;
-  amenities: string[];
-  images: string[];
-  openTime: string;
-  closeTime: string;
-  phone: string;
-  isActive: boolean;
-  rating: number;
-  reviewCount: number;
-  createdAt: string;
-}
-
 export default function PitchDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [field, setField] = useState<Field | null>(null);
+  const [field, setField] = useState<Pitch | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -253,8 +230,13 @@ export default function PitchDetails() {
         <div className="px-4 py-5">
           <h1 className="text-2xl font-black text-white mb-1">{field.name}</h1>
           <div className="flex items-center text-slate-500 text-sm mb-4 gap-1">
-            <MapPin className="w-4 h-4 flex-shrink-0" />
-            <span>{field.address}, {field.city}</span>
+            <MapPin className="w-4 h-4 flex-shrink-0 text-blue-400" />
+            <span>
+              {field.address && field.address !== 'Manzil kiritilmagan' ? field.address : ''}
+              {field.address && field.address !== 'Manzil kiritilmagan' && field.city && field.city !== 'Shahar kiritilmagan' ? ', ' : ''}
+              {field.city && field.city !== 'Shahar kiritilmagan' ? field.city : ''}
+              {(!field.address || field.address === 'Manzil kiritilmagan') && (!field.city || field.city === 'Shahar kiritilmagan') ? "Manzil ko'rsatilmagan" : ''}
+            </span>
           </div>
 
           {field.description && (
@@ -266,10 +248,17 @@ export default function PitchDetails() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-slate-500 text-xs mb-1">Narxi</div>
-                <div className="text-3xl font-black text-blue-400">
-                  {field.pricePerHour.toLocaleString()}
-                  <span className="text-base font-normal text-slate-500 ml-1">so'm/soat</span>
-                </div>
+                {field.pricePerHour > 0 ? (
+                  <div className="text-3xl font-black text-blue-400">
+                    {field.pricePerHour.toLocaleString()}
+                    <span className="text-base font-normal text-slate-500 ml-1">so'm/soat</span>
+                  </div>
+                ) : (
+                  <div className="text-3xl font-black text-emerald-400">
+                    Bepul
+                    <span className="text-base font-normal text-slate-500 ml-1">/ kelishiladi</span>
+                  </div>
+                )}
               </div>
               <div className="text-right">
                 <div className="text-slate-500 text-xs mb-1">Ish vaqti</div>
@@ -299,13 +288,13 @@ export default function PitchDetails() {
           {/* Stats grid */}
           <div className="grid grid-cols-4 gap-2 mb-5">
             {[
-              { label: 'Hajm', value: field.size },
-              { label: 'Yuza', value: field.surface },
-              { label: 'Reyting', value: String(field.rating || 0) },
+              { label: 'Vaqt', value: `${field.openTime?.slice(0,5)}` },
+              { label: 'Oldindan', value: `${field.advanceBookingDays} kun` },
+              { label: 'Reyting', value: field.rating > 0 ? String(field.rating) : '—' },
               { label: 'Sharhlar', value: String(field.reviewCount || 0) },
             ].map(item => (
               <div key={item.label} className="bg-[#0d1526] rounded-lg p-3 text-center border border-white/5">
-                <div className="text-base font-black text-blue-400 mb-0.5">{item.value}</div>
+                <div className="text-base font-black text-blue-400 mb-0.5 truncate">{item.value}</div>
                 <div className="text-[10px] text-slate-600">{item.label}</div>
               </div>
             ))}
@@ -315,38 +304,61 @@ export default function PitchDetails() {
           <div className="mb-5">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Bog'lanish</h3>
             <div className="bg-[#0d1526] rounded-lg p-4 border border-white/5">
-              <div className="flex items-center justify-between mb-4">
+              {field.phone ? (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                        <Phone className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div>
+                        <div className="text-slate-600 text-xs">Telefon</div>
+                        <div className="text-white font-semibold">{formatPhoneNumber(field.phone)}</div>
+                      </div>
+                    </div>
+                    <a href={`tel:${field.phone}`} className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg transition-colors">
+                      <Phone className="w-4 h-4" />
+                    </a>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <a
+                      href={`https://t.me/${field.phone.replace('+', '')}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white py-2.5 rounded-lg text-sm font-medium transition-colors border border-white/5"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      Telegram
+                    </a>
+                    <button
+                      onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${field.lat},${field.lng}`)}
+                      disabled={!field.lat || !field.lng}
+                      className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white py-2.5 rounded-lg text-sm font-medium transition-colors border border-white/5 disabled:opacity-40"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Xaritada
+                    </button>
+                  </div>
+                </>
+              ) : (
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-blue-500/10 rounded-lg flex items-center justify-center">
-                    <Phone className="w-4 h-4 text-blue-400" />
+                  <div className="w-9 h-9 bg-slate-800 rounded-lg flex items-center justify-center">
+                    <Phone className="w-4 h-4 text-slate-600" />
                   </div>
                   <div>
                     <div className="text-slate-600 text-xs">Telefon</div>
-                    <div className="text-white font-semibold">{formatPhoneNumber(field.phone)}</div>
+                    <div className="text-slate-500 text-sm">Ko'rsatilmagan</div>
                   </div>
+                  {(field.lat && field.lng) && (
+                    <button
+                      onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${field.lat},${field.lng}`)}
+                      className="ml-auto flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors border border-white/5"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Xaritada
+                    </button>
+                  )}
                 </div>
-                <a href={`tel:${field.phone}`} className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg transition-colors">
-                  <Phone className="w-4 h-4" />
-                </a>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <a
-                  href={`https://t.me/${field.phone.replace('+', '')}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white py-2.5 rounded-lg text-sm font-medium transition-colors border border-white/5"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Telegram
-                </a>
-                <button
-                  onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${field.lat},${field.lng}`)}
-                  disabled={!field.lat || !field.lng}
-                  className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white py-2.5 rounded-lg text-sm font-medium transition-colors border border-white/5 disabled:opacity-40"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Xaritada
-                </button>
-              </div>
+              )}
             </div>
           </div>
 

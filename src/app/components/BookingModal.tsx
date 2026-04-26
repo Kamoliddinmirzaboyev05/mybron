@@ -55,13 +55,8 @@ export default function BookingModal({
       const dateStr = toDateString(selectedDate);
       const response = await api.getFieldSlots(pitch.id, dateStr);
       
-      // Find slots for the selected date (the API returns an array of dates)
-      const dateData = response.dates.find(d => d.date === dateStr);
-      if (dateData) {
-        setAvailableSlots(dateData.slots);
-      } else {
-        setAvailableSlots([]);
-      }
+      // API returns { slots: FieldSlot[] }
+      setAvailableSlots(response.slots || []);
     } catch (err) {
       console.error('Exception while fetching slots:', err);
       setAvailableSlots([]);

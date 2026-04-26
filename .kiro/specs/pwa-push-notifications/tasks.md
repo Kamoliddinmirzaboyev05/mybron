@@ -2,7 +2,7 @@
 
 ## Tasks
 
-- [ ] 1. VAPID utility va environment sozlamalari
+- [-] 1. VAPID utility va environment sozlamalari
   - [ ] 1.1 `src/app/lib/vapid.ts` faylini yarat: `urlBase64ToUint8Array(base64String: string): Uint8Array` funksiyasini yoz (iOS Safari uchun zarur konvertatsiya)
   - [ ] 1.2 `isPushSupported(): boolean` va `isIOSStandalone(): boolean` yordamchi funksiyalarini `src/app/lib/notifications.ts` ga qo'sh
   - [ ] 1.3 `.env.example` faylini yarat: `VITE_VAPID_PUBLIC_KEY=` va `VAPID_PRIVATE_KEY=` va `VAPID_SUBJECT=` o'zgaruvchilarini hujjatlashtir

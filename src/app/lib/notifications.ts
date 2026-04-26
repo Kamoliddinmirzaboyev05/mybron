@@ -126,3 +126,34 @@ export function clearNotifications() {
   localStorage.removeItem(STORAGE_KEY);
   window.dispatchEvent(new Event('mybron_notif_update'));
 }
+// ─── Platform detection helpers ───────────────────────────────────────────────
+
+/**
+ * Checks if the current browser supports push notifications.
+ * 
+ * @returns `true` if both `PushManager` and `Notification` APIs are available,
+ *          `false` otherwise.
+ */
+export function isPushSupported(): boolean {
+  return 'PushManager' in window && 'Notification' in window;
+}
+
+/**
+ * Checks if the app is running in iOS Safari standalone mode (installed as PWA).
+ * 
+ * iOS Safari only supports push notifications when the PWA is installed
+ * and running in standalone mode (not in regular browser mode).
+ * 
+ * @returns `true` if running on iOS in standalone PWA mode, `false` otherwise.
+ */
+export function isIOSStandalone(): boolean {
+  // Check if iOS
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  
+  if (!isIOS) return false;
+  
+  // Check if in standalone mode (installed PWA)
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+  
+  return isStandalone;
+}

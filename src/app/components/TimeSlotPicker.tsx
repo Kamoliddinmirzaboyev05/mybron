@@ -27,7 +27,10 @@ export default function TimeSlotPicker({
   }, [selectedSlots]);
 
   const getSlotDisplay = (slot: FieldSlot): string => {
-    return `${slot.startTime} - ${slot.endTime}`;
+    // Ensure time format is HH:MM
+    const start = slot.startTime.length === 5 ? slot.startTime : slot.startTime.slice(0, 5);
+    const end = slot.endTime.length === 5 ? slot.endTime : slot.endTime.slice(0, 5);
+    return `${start} - ${end}`;
   };
 
   const getSlotHour = (display: string): number => {

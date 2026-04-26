@@ -88,28 +88,26 @@ export function getCurrentHour(): number {
 
 /**
  * Filter out past time slots for today
- * @param slots - Array of time slot strings like "08:00 - 09:00"
+ * @param slots - Array of FieldSlot objects
  * @param selectedDate - The selected date
- * @returns Filtered array of time slots
+ * @returns Filtered array of FieldSlot objects
  * 
  * CRITICAL FIX: For "Bugun" (Today), hide all past time slots.
  * Example: If current time is 21:45, only show slots starting from 22:00 onwards.
  * For "Ertaga" (Tomorrow) and future dates, show all available slots.
  */
-export function filterPastSlots(slots: string[], selectedDate: Date): string[] {
+export function filterPastSlots<T extends { startTime: string }>(slots: T[], selectedDate: Date): T[] {
   // If not today, return all slots (for tomorrow and future dates)
   if (!isToday(selectedDate)) {
     return slots;
   }
 
   const currentHour = getCurrentHour();
-  const currentMinutes = new Date().getMinutes();
   
   // Filter out slots that have already passed or are currently in progress
   // A slot is available only if it starts AFTER the current hour
   return slots.filter(slot => {
-    const [startStr] = slot.split(' - ');
-    const slotHour = parseInt(startStr.split(':')[0]);
+    const slotHour = parseInt(slot.startTime.split(':')[0]);
     
     // If the slot hour is greater than current hour, it's available
     // If the slot hour equals current hour, it's already in progress, so exclude it

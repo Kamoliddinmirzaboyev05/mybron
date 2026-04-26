@@ -70,6 +70,9 @@ export default function Home() {
       setFields(response);
     } catch (err) {
       console.error(err);
+      toast.error('Maydonlarni yuklashda xatolik', {
+        description: 'Server bilan bog\'lanib bo\'lmadi'
+      });
     } finally {
       setLoading(false);
     }
