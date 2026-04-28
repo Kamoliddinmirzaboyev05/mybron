@@ -5,7 +5,7 @@
 ### 1. Maydonlar Ro'yxati
 ```bash
 # Browser console da:
-fetch('http://103.6.169.242/api/fields/')
+fetch('https://gobronapi.webportfolio.uz/api/fields/')
   .then(r => r.json())
   .then(console.log)
 ```
@@ -28,7 +28,7 @@ Kutilgan natija:
 ### 2. Slotlar
 ```bash
 # Browser console da:
-fetch('http://103.6.169.242/api/fields/4/slots/?date=2026-04-27')
+fetch('https://gobronapi.webportfolio.uz/api/fields/4/slots/?date=2026-04-27')
   .then(r => r.json())
   .then(console.log)
 ```

@@ -62,7 +62,7 @@ cp .env.example .env.local
 
 `.env.local` faylini tahrirlang (agar kerak bo'lsa):
 ```bash
-VITE_API_URL=http://103.6.169.242/api
+VITE_API_URL=https://gobronapi.webportfolio.uz/api
 ```
 
 4. **Development serverni ishga tushirish:**
@@ -87,7 +87,7 @@ npm run preview
 
 ## 🌐 API Integration
 
-Backend API: `http://103.6.169.242/api`
+Backend API: `https://gobronapi.webportfolio.uz/api`
 
 Barcha API endpointlar `API_ENDPOINTS.md` faylida hujjatlashtirilgan.
 
@@ -195,7 +195,7 @@ Backend da CORS sozlang. `CORS_SETUP.md` ga qarang.
 ## 📞 Contact
 
 - Email: admin@mybron.uz
-- Website: http://103.6.169.242
+- Website: https://gobronapi.webportfolio.uz
 
 ---
 

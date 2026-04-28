@@ -2,7 +2,7 @@
 // API - Backend integration
 // ============================================================
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://103.6.169.242/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://gobronapi.webportfolio.uz/api';
 
 // Types
 export interface User {

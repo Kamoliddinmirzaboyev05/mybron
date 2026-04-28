@@ -1,7 +1,7 @@
 # Production Deployment Guide
 
 ## Server Ma'lumotlari
-- **Backend URL:** `http://103.6.169.242/api`
+- **Backend URL:** `https://gobronapi.webportfolio.uz/api`
 - **Frontend:** Static build (Vite)
 
 ## 1. Environment Sozlash
@@ -9,12 +9,12 @@
 ### Production uchun `.env.production` yarating:
 ```bash
 # .env.production
-VITE_API_URL=http://103.6.169.242/api
+VITE_API_URL=https://gobronapi.webportfolio.uz/api
 VITE_VAPID_PUBLIC_KEY=your_vapid_public_key_here
 ```
 
 ### Yoki default qiymatdan foydalaning:
-`.env` faylsiz ham ishlaydi, chunki `api.ts` da default qiymat `http://103.6.169.242/api`
+`.env` faylsiz ham ishlaydi, chunki `api.ts` da default qiymat `https://gobronapi.webportfolio.uz/api`
 
 ## 2. Production Build
 
@@ -42,7 +42,7 @@ Build natijasi `dist/` papkasida bo'ladi.
 ```nginx
 server {
     listen 80;
-    server_name yourdomain.com;  # yoki IP: 103.6.169.242
+    server_name gobronapi.webportfolio.uz;
     
     root /var/www/mybron/dist;
     index index.html;
@@ -108,13 +108,13 @@ server {
 
 ### SSH orqali serverga ulanish:
 ```bash
-ssh user@103.6.169.242
+ssh user@gobronapi.webportfolio.uz
 ```
 
 ### Build fayllarni serverga yuklash:
 ```bash
 # Local mashinada
-scp -r dist/* user@103.6.169.242:/var/www/mybron/dist/
+scp -r dist/* user@gobronapi.webportfolio.uz:/var/www/mybron/dist/
 ```
 
 ### Yoki Git orqali:
@@ -134,8 +134,8 @@ Django uchun:
 ```python
 # settings.py
 CORS_ALLOWED_ORIGINS = [
-    "http://103.6.169.242",
-    "http://103.6.169.242:3000",
+    "https://gobronapi.webportfolio.uz",
+    "https://gobronapi.webportfolio.uz:3000",
     "http://localhost:3000",  # development uchun
 ]
 ```
@@ -158,7 +158,7 @@ VITE_API_URL=https://api.yourdomain.com/api
 
 ## 8. Tekshirish
 
-1. **Frontend:** `http://103.6.169.242` ochib ko'ring
+1. **Frontend:** `https://gobronapi.webportfolio.uz` ochib ko'ring
 2. **API:** Browser console da xato yo'qligini tekshiring
 3. **PWA:** "Install" tugmasi ko'rinishini tekshiring
 4. **Network:** DevTools → Network → API so'rovlar muvaffaqiyatli bo'lishini tekshiring
@@ -183,10 +183,10 @@ Har safar kod o'zgarganda:
 npm run build
 
 # Serverga yuklash
-scp -r dist/* user@103.6.169.242:/var/www/mybron/dist/
+scp -r dist/* user@gobronapi.webportfolio.uz:/var/www/mybron/dist/
 
 # Yoki Git orqali
-ssh user@103.6.169.242
+ssh user@gobronapi.webportfolio.uz
 cd /var/www/mybron
 git pull
 npm run build

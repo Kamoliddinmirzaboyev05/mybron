@@ -4,7 +4,7 @@ Bu hujjat frontend tomonidan ishlatiladigan barcha backend API endpointlarni ko'
 
 ## Base URL
 ```
-Base URL: http://103.6.169.242/api
+Base URL: https://gobronapi.webportfolio.uz/api
 ```
 
 Environment variable: `VITE_API_URL` (optional, defaults to production)

@@ -32,14 +32,14 @@ Agar backend bilan ishlashda CORS xatosi chiqsa:
 
 ```bash
 # .env.local
-VITE_API_URL=http://103.6.169.242/api
+VITE_API_URL=https://gobronapi.webportfolio.uz/api
 ```
 
 ## Xatolarni tuzatish
 
 ### CORS xatosi
 ```
-Access to fetch at 'http://103.6.169.242/api/fields/' from origin 'http://localhost:3000' 
+Access to fetch at 'https://gobronapi.webportfolio.uz/api/fields/' from origin 'http://localhost:3000' 
 has been blocked by CORS policy
 ```
 

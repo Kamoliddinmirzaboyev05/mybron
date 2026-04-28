@@ -292,16 +292,16 @@ Network error (server ishlamayapti)
 ### Automated Test
 ```javascript
 // Test 1: Public endpoint without auth
-fetch('http://103.6.169.242/api/fields/')
+fetch('https://gobronapi.webportfolio.uz/api/fields/')
   .then(r => r.json())
   .then(console.log)
 
 // Test 2: Protected endpoint without auth (should fail)
-fetch('http://103.6.169.242/api/bookings/')
+fetch('https://gobronapi.webportfolio.uz/api/bookings/')
   .then(r => console.log(r.status)) // 401
 
 // Test 3: Protected endpoint with auth
-fetch('http://103.6.169.242/api/bookings/', {
+fetch('https://gobronapi.webportfolio.uz/api/bookings/', {
   headers: { 'Authorization': 'Bearer YOUR_TOKEN' }
 })
   .then(r => r.json())

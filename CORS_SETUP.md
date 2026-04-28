@@ -1,9 +1,9 @@
 # CORS Sozlash (Backend)
 
 ## Muammo
-Frontend (`http://localhost:3000`) dan backend (`http://103.6.169.242`) ga so'rov yuborilganda CORS xatosi:
+Frontend (`http://localhost:3000`) dan backend (`https://gobronapi.webportfolio.uz`) ga so'rov yuborilganda CORS xatosi:
 ```
-Access to fetch at 'http://103.6.169.242/api/fields/' from origin 'http://localhost:3000' 
+Access to fetch at 'https://gobronapi.webportfolio.uz/api/fields/' from origin 'http://localhost:3000' 
 has been blocked by CORS policy
 ```
 
@@ -40,7 +40,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://103.6.169.242",
+    "https://gobronapi.webportfolio.uz",
 ]
 
 # Credentials (cookies, authorization headers) uchun
@@ -83,7 +83,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://103.6.169.242",
+        "https://gobronapi.webportfolio.uz",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -106,8 +106,8 @@ app.use(cors({
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3001',
-    'http://103.6.169.242',
-    'http://103.6.169.242:3000',
+    'https://gobronapi.webportfolio.uz',
+    'https://gobronapi.webportfolio.uz:3000',
   ],
   credentials: true,
 }));
@@ -122,7 +122,7 @@ server: {
   port: 3000,
   proxy: {
     '/api': {
-      target: 'http://103.6.169.242',
+      target: 'https://gobronapi.webportfolio.uz',
       changeOrigin: true,
       secure: false,
     }
