@@ -36,14 +36,11 @@ MIDDLEWARE = [
 # Development uchun (barcha originlarga ruxsat)
 CORS_ALLOW_ALL_ORIGINS = True
 
-# Yoki faqat ma'lum originlarga ruxsat (Production uchun tavsiya etiladi)
+# Production uchun tavsiya etiladi
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3001",
     "http://103.6.169.242",
-    "http://103.6.169.242:3000",
 ]
 
 # Credentials (cookies, authorization headers) uchun
@@ -86,10 +83,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
         "http://103.6.169.242",
-        "http://103.6.169.242:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -128,7 +122,7 @@ server: {
   port: 3000,
   proxy: {
     '/api': {
-      target: 'http://127.0.0.1:8000',
+      target: 'http://103.6.169.242',
       changeOrigin: true,
       secure: false,
     }

@@ -62,11 +62,7 @@ cp .env.example .env.local
 
 `.env.local` faylini tahrirlang (agar kerak bo'lsa):
 ```bash
-# Local development uchun
-VITE_API_URL=http://127.0.0.1:8000/api
-
-# Production (default)
-# VITE_API_URL=http://103.6.169.242/api
+VITE_API_URL=http://103.6.169.242/api
 ```
 
 4. **Development serverni ishga tushirish:**

@@ -121,21 +121,15 @@ export default function PitchDetails() {
     setShowBookingModal(true);
   };
 
-  const handleBookingConfirm = async (dateStr: string, slots: string[], totalHours: number, totalPrice: number, slotIds: string[]) => {
+  const handleBookingConfirm = async (dateStr: string, slots: string[], totalHours: number, totalPrice: number, slotIds: string[], note?: string) => {
     if (!user || !id || slotIds.length === 0) return;
 
-    // slots are like ["18:00 - 19:00", "19:00 - 20:00"]
-    const startTime = slots[0].split(' - ')[0];
-    const endTime = slots[slots.length - 1].split(' - ')[1];
-
     try {
-      // Use the first slot ID for booking (API books one slot at a time)
       await api.bookSlot({
         slotId: slotIds[0],
         fieldId: id,
         date: dateStr,
-        startTime,
-        endTime
+        note: note || ''
       });
       
       setShowBookingModal(false);

@@ -4,8 +4,7 @@ Bu hujjat frontend tomonidan ishlatiladigan barcha backend API endpointlarni ko'
 
 ## Base URL
 ```
-Production: http://103.6.169.242/api
-Development (local): http://127.0.0.1:8000/api
+Base URL: http://103.6.169.242/api
 ```
 
 Environment variable: `VITE_API_URL` (optional, defaults to production)

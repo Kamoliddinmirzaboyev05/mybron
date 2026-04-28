@@ -9,7 +9,7 @@ interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   pitch: Pitch;
-  onConfirm: (dateStr: string, slots: string[], totalHours: number, totalPrice: number, slotIds: string[]) => Promise<void>;
+  onConfirm: (dateStr: string, slots: string[], totalHours: number, totalPrice: number, slotIds: string[], note?: string) => Promise<void>;
   onDateChange: (dateStr: string) => void;
 }
 
@@ -26,6 +26,7 @@ export default function BookingModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<FieldSlot[]>([]);
   const [loading, setLoading] = useState(false);
+  const [note, setNote] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -90,7 +91,7 @@ export default function BookingModal({
         const totalHours = selectedSlots.length;
         const totalPrice = pitch.pricePerHour * totalHours;
 
-        await onConfirm(dateStr, selectedSlots, totalHours, totalPrice, selectedSlotIds);
+        await onConfirm(dateStr, selectedSlots, totalHours, totalPrice, selectedSlotIds, note);
       } finally {
         setIsSubmitting(false);
       }
@@ -133,6 +134,15 @@ export default function BookingModal({
               pricePerHour={pitch.pricePerHour}
             />
           )}
+          <div className="space-y-2">
+            <label className="text-sm text-slate-500">Izoh (ixtiyoriy)</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Bu yerda izoh qoldiring..."
+              className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-slate-600 resize-none h-20 text-sm"
+            />
+          </div>
         </div>
 
         {/* Footer */}

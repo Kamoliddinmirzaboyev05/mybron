@@ -263,7 +263,12 @@ class ApiClient {
     const images: string[] = [];
     if (apiField.cover_image_url) images.push(apiField.cover_image_url);
 
-    // Parse location_url for lat/lng if it's a Google Maps URL
+    if (Array.isArray(apiField.images)) {
+      apiField.images.forEach((img: any) => {
+        if (img.image_url) images.push(img.image_url);
+      });
+    }
+
     let lat: number | null = null;
     let lng: number | null = null;
     if (apiField.location_url) {
@@ -294,7 +299,7 @@ class ApiClient {
       isActive: apiField.is_active ?? true,
       subscriptionValid: apiField.subscription_valid ?? true,
       advanceBookingDays: apiField.advance_booking_days ?? 1,
-      imagesCount: apiField.images_count ?? 0,
+      imagesCount: apiField.images_count ?? images.length,
       rating: apiField.rating || 0,
       reviewCount: apiField.review_count || 0,
       createdAt: apiField.created_at || new Date().toISOString(),
@@ -353,17 +358,15 @@ class ApiClient {
     slotId: string;
     fieldId: string;
     date: string;
-    startTime: string;
-    endTime: string;
+    note?: string;
   }): Promise<Booking> {
     const res = await this.request<any>('/bookings/', {
       method: 'POST',
       body: JSON.stringify({
-        field: slotData.fieldId,
-        booking_date: slotData.date,
-        start_time: slotData.startTime,
-        end_time: slotData.endTime,
-        slot: slotData.slotId,
+        slot_id: parseInt(slotData.slotId),
+        field_id: parseInt(slotData.fieldId),
+        date: slotData.date,
+        note: slotData.note || '',
       }),
     });
     return this.normalizeBooking(res);

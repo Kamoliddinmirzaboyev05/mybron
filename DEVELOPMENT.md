@@ -23,34 +23,23 @@ Server `http://localhost:3000` da ishga tushadi.
 ## Backend bilan ishlash
 
 ### CORS muammosi
-Agar backend `http://127.0.0.1:8000` da ishlayotgan bo'lsa va CORS xatosi chiqsa:
+Agar backend bilan ishlashda CORS xatosi chiqsa:
 
-**Yechim 1: Backend da CORS sozlash (tavsiya etiladi)**
+**Yechim: Backend da CORS sozlash (tavsiya etiladi)**
 - `CORS_SETUP.md` faylini o'qing va backend da CORS sozlang
-
-**Yechim 2: Proxy ishlatish (allaqachon sozlangan)**
-- `vite.config.ts` da proxy allaqachon sozlangan
-- Serverni qayta ishga tushiring: `npm run dev`
 
 ### API URL sozlash
 
-Production uchun (default):
 ```bash
 # .env.local
-# VITE_API_URL o'rnatilmagan - http://103.6.169.242/api ishlatadi
-```
-
-Local development uchun:
-```bash
-# .env.local
-VITE_API_URL=http://127.0.0.1:8000/api
+VITE_API_URL=http://103.6.169.242/api
 ```
 
 ## Xatolarni tuzatish
 
 ### CORS xatosi
 ```
-Access to fetch at 'http://127.0.0.1:8000/api/fields/' from origin 'http://localhost:3000' 
+Access to fetch at 'http://103.6.169.242/api/fields/' from origin 'http://localhost:3000' 
 has been blocked by CORS policy
 ```
 
