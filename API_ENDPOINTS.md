@@ -142,19 +142,29 @@ Response: {
 
 ### Get Field Slots
 ```http
-GET /admin/fields/{field_id}/slots/?date=YYYY-MM-DD
+GET /fields/{field_id}/slots/?date=YYYY-MM-DD
 
-Response: [
-  {
-    "id": number,
-    "field": number,
-    "date": "YYYY-MM-DD",
-    "start_time": "HH:MM:SS",
-    "end_time": "HH:MM:SS",
-    "is_active": boolean,
-    "is_booked": boolean
-  }
-]
+Response: {
+  "field_id": number,
+  "field_name": "string",
+  "date": "YYYY-MM-DD",
+  "price_per_hour": "string",
+  "advance_booking_days": number,
+  "available_dates": ["YYYY-MM-DD"],
+  "slots": [
+    {
+      "id": number,
+      "field": number,
+      "field_id": number,
+      "field_name": "string",
+      "date": "YYYY-MM-DD",
+      "start_time": "HH:MM:SS",
+      "end_time": "HH:MM:SS",
+      "is_active": boolean,
+      "is_booked": boolean
+    }
+  ]
+}
 ```
 
 ## Bookings

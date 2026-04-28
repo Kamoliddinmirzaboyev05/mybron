@@ -141,14 +141,15 @@ class ApiClient {
     localStorage.removeItem('user');
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}, retry = true): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}, requireAuth = true): Promise<T> {
     const url = `${BASE_URL}${endpoint}`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> || {}),
     };
 
-    if (this.accessToken) {
+    // Only add Authorization header if auth is required and token exists
+    if (requireAuth && this.accessToken) {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
     }
 
@@ -158,10 +159,11 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      if (response.status === 401 && retry && this.refreshToken) {
+      // Only try to refresh token if auth is required
+      if (response.status === 401 && requireAuth && this.refreshToken) {
         try {
           await this.refreshAccessToken();
-          return this.request<T>(endpoint, options, false);
+          return this.request<T>(endpoint, options, requireAuth);
         } catch {
           this.clearTokens();
           window.location.href = '/login';
@@ -246,14 +248,14 @@ class ApiClient {
     return normalized;
   }
 
-  // Field/Pitch methods (real API)
+  // Field/Pitch methods (real API - no auth required)
   async getFields(): Promise<Pitch[]> {
-    const res = await this.request<any>('/fields/');
+    const res = await this.request<any>('/fields/', {}, false);
     return (res.results || []).map((f: any) => this.normalizeField(f));
   }
 
   async getFieldById(id: string): Promise<Pitch> {
-    const res = await this.request<any>(`/fields/${id}/`);
+    const res = await this.request<any>(`/fields/${id}/`, {}, false);
     return this.normalizeField(res);
   }
 
@@ -299,10 +301,10 @@ class ApiClient {
     };
   }
 
-  // Slot methods (real API)
+  // Slot methods (real API - no auth required)
   async getFieldSlots(fieldId: string, dateStr: string): Promise<FieldSlotsResponse> {
-    const res = await this.request<any[]>(`/admin/fields/${fieldId}/slots/?date=${dateStr}`);
-    const slots = res.map((slot: any) => this.normalizeSlot(slot));
+    const res = await this.request<any>(`/fields/${fieldId}/slots/?date=${dateStr}`, {}, false);
+    const slots = (res.slots || []).map((slot: any) => this.normalizeSlot(slot));
     return { slots };
   }
 

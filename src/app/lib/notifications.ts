@@ -52,13 +52,16 @@ export async function showNotification(
   if ('serviceWorker' in navigator) {
     const reg = await navigator.serviceWorker.getRegistration();
     if (reg) {
-      await reg.showNotification(title, {
+      // Create notification options with vibrate support
+      const notificationOptions: NotificationOptions & { vibrate?: number[] } = {
         body: options.body,
         icon: '/bronlogo.png',
         badge: '/bronlogo.png',
-        vibrate: [200, 100, 200],
         data: { url: options.url || '/' },
-      });
+        vibrate: [200, 100, 200],
+      };
+      
+      await reg.showNotification(title, notificationOptions);
       return;
     }
   }

@@ -140,6 +140,12 @@ export default function Register() {
       });
       if (result.error) throw result.error;
       setSuccess(true);
+      // Check if user came from a pitch details page
+      const returnTo = sessionStorage.getItem('returnToPitch');
+      if (returnTo) {
+        sessionStorage.removeItem('returnToPitch');
+        setTimeout(() => navigate(`/pitch/${returnTo}`), 1500);
+      }
     } catch (err: any) {
       const msg = err.message || 'Ro\'yxatdan o\'tishda xatolik yuz berdi';
       setErrors(prev => ({ ...prev, general: msg }));
@@ -149,6 +155,7 @@ export default function Register() {
   };
 
   if (success) {
+    const returnTo = sessionStorage.getItem('returnToPitch');
     return (
       <div className="min-h-screen bg-[#020817] flex items-center justify-center px-6">
         <div className="max-w-sm w-full text-center">
@@ -156,13 +163,17 @@ export default function Register() {
             <CheckCircle className="w-10 h-10 text-emerald-400" />
           </div>
           <h1 className="text-2xl font-black text-white mb-2">Ro'yxatdan o'tdingiz!</h1>
-          <p className="text-slate-500 mb-8">Hisobingiz muvaffaqiyatli yaratildi.</p>
-          <button
-            onClick={() => navigate('/')}
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-2xl font-bold transition-colors"
-          >
-            Boshlash
-          </button>
+          <p className="text-slate-500 mb-8">
+            {returnTo ? 'Maydon sahifasiga qaytilmoqda...' : 'Hisobingiz muvaffaqiyatli yaratildi.'}
+          </p>
+          {!returnTo && (
+            <button
+              onClick={() => navigate('/')}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-2xl font-bold transition-colors"
+            >
+              Boshlash
+            </button>
+          )}
         </div>
       </div>
     );
