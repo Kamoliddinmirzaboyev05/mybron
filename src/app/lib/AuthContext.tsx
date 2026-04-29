@@ -12,6 +12,7 @@ interface AuthContextType {
   }) => Promise<{ error: any }>;
   sendOTP: (phone: string) => Promise<{ error: any }>;
   verifyOTP: (phone: string, code: string) => Promise<{ exists: boolean; error: any }>;
+  webAuth: (token: string) => Promise<{ user: User | null; error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -80,13 +81,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const webAuth = async (token: string) => {
+    try {
+      const response = await api.webAuth(token);
+      setUser(response.user);
+      return { user: response.user, error: null };
+    } catch (error: any) {
+      return { user: null, error };
+    }
+  };
+
   const signOut = async () => {
     await api.logout();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, sendOTP, verifyOTP, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, sendOTP, verifyOTP, webAuth, signOut }}>
       {children}
     </AuthContext.Provider>
   );

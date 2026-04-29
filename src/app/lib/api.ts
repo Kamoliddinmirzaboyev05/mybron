@@ -13,6 +13,7 @@ export interface User {
   fullName: string;
   login: string;
   role: 'user' | 'admin';
+  user_role?: 'PLAYER' | 'OWNER';
   phone?: string;
   avatar_url?: string | null;
   date_joined?: string;
@@ -22,7 +23,19 @@ export interface AuthResponse {
   user: User;
   access: string;
   refresh: string;
+  tokens?: {
+    access: string;
+    refresh: string;
+  };
   is_new_user?: boolean;
+}
+
+export interface WebAuthResponse {
+  tokens: {
+    access: string;
+    refresh: string;
+  };
+  user: User;
 }
 
 export interface SendOTPResponse {
@@ -208,6 +221,18 @@ class ApiClient {
   }
 
   // Auth methods (real API)
+  async webAuth(token: string): Promise<WebAuthResponse> {
+    const res = await this.request<any>(`/auth/web-auth/?token=${token}`, {
+      method: 'GET',
+    }, false);
+    
+    const user = this.normalizeUser(res.user);
+    this.setTokens(res.tokens.access, res.tokens.refresh);
+    this.setUser(user);
+    
+    return { ...res, user };
+  }
+
   async sendOTP(phone: string): Promise<SendOTPResponse> {
     return this.request<SendOTPResponse>('/auth/send-otp/', {
       method: 'POST',

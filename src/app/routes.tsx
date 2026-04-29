@@ -6,7 +6,6 @@ import Notifications from "./pages/Notifications";
 import Profile from "./pages/Profile";
 import MyReviews from "./pages/MyReviews";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import GuestRoute from "./components/GuestRoute";
@@ -28,17 +27,11 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        path: "register",
-        Component: GuestRoute,
-        children: [
-          {
-            path: "",
-            Component: Register,
-          },
-        ],
+        path: "",
+        Component: Home,
       },
       {
-        path: "",
+        path: "player-dashboard",
         Component: Home,
       },
       {
