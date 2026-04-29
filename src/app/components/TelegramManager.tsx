@@ -34,6 +34,9 @@ export default function TelegramManager() {
         }
 
         if (user) {
+          // Remove token from URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
           // Role bo'yicha redirect
           if (user.user_role === 'OWNER') {
             window.location.href = 'https://gobrononline.webportfolio.uz';

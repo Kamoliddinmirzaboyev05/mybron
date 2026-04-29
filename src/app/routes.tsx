@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router";
 import Home from "./pages/Home";
+import PlayerDashboard from "./pages/PlayerDashboard";
 import PitchDetails from "./pages/PitchDetails";
 import Bookings from "./pages/Bookings";
 import Notifications from "./pages/Notifications";
@@ -32,7 +33,13 @@ export const router = createBrowserRouter([
       },
       {
         path: "player-dashboard",
-        Component: Home,
+        Component: ProtectedRoute,
+        children: [
+          {
+            path: "",
+            Component: PlayerDashboard,
+          },
+        ],
       },
       {
         path: "pitch/:id",

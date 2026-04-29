@@ -1,6 +1,4 @@
-// ============================================================
-// API - Backend integration
-// ============================================================
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'https://gobronapi.webportfolio.uz/api';
 
@@ -134,81 +132,120 @@ export interface FieldSlotsResponse {
 
 // API Client
 class ApiClient {
-  private accessToken: string | null = null;
-  private refreshToken: string | null = null;
+  private axiosInstance: AxiosInstance;
+  private isRefreshing = false;
+  private refreshSubscribers: ((token: string) => void)[] = [];
 
   constructor() {
-    this.accessToken = localStorage.getItem('access_token');
-    this.refreshToken = localStorage.getItem('refresh_token');
+    this.axiosInstance = axios.create({
+      baseURL: BASE_URL,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    // Request interceptor
+    this.axiosInstance.interceptors.request.use(
+      (config: InternalAxiosRequestConfig) => {
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    // Response interceptor
+    this.axiosInstance.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
+
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          if (this.isRefreshing) {
+            return new Promise((resolve) => {
+              this.refreshSubscribers.push((token: string) => {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+                resolve(this.axiosInstance(originalRequest));
+              });
+            });
+          }
+
+          originalRequest._retry = true;
+          this.isRefreshing = true;
+
+          try {
+            const refresh = localStorage.getItem('refresh_token');
+            if (!refresh) throw new Error('No refresh token');
+
+            const res = await axios.post(`${BASE_URL}/auth/token/refresh/`, { refresh });
+            const { access } = res.data;
+
+            localStorage.setItem('access_token', access);
+            this.isRefreshing = false;
+            this.onRefreshed(access);
+
+            originalRequest.headers.Authorization = `Bearer ${access}`;
+            return this.axiosInstance(originalRequest);
+          } catch (refreshError) {
+            this.isRefreshing = false;
+            this.clearTokens();
+            window.location.href = '/login';
+            return Promise.reject(refreshError);
+          }
+        }
+
+        const errorData = error.response?.data || {};
+        const errorMsg = errorData.detail || errorData.message || Object.values(errorData).flat().join(', ') || `Xatolik: ${error.response?.status || 'Unknown'}`;
+        return Promise.reject(new Error(errorMsg));
+      }
+    );
+  }
+
+  private onRefreshed(token: string) {
+    this.refreshSubscribers.forEach((callback) => callback(token));
+    this.refreshSubscribers = [];
   }
 
   setTokens(access: string, refresh: string) {
-    this.accessToken = access;
-    this.refreshToken = refresh;
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
   }
 
   getToken(): string | null {
-    return this.accessToken;
+    return localStorage.getItem('access_token');
   }
 
   clearTokens() {
-    this.accessToken = null;
-    this.refreshToken = null;
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}, requireAuth = true): Promise<T> {
-    const url = `${BASE_URL}${endpoint}`;
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string> || {}),
-    };
-
-    // Only add Authorization header if auth is required and token exists
-    if (requireAuth && this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
-    }
-
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      // Only try to refresh token if auth is required
-      if (response.status === 401 && requireAuth && this.refreshToken) {
-        try {
-          await this.refreshAccessToken();
-          return this.request<T>(endpoint, options, requireAuth);
-        } catch {
-          this.clearTokens();
-          window.location.href = '/login';
-          throw new Error('Sessiya tugadi. Iltimos, qayta kiring.');
-        }
-      }
-      const errorData = await response.json().catch(() => ({}));
-      const errorMsg = errorData.detail || errorData.message || Object.values(errorData).flat().join(', ') || `Xatolik: ${response.status}`;
-      throw new Error(errorMsg);
-    }
-
-    return response.json();
+  setUser(user: User) {
+    localStorage.setItem('user', JSON.stringify(user));
   }
 
-  async refreshAccessToken(): Promise<void> {
-    if (!this.refreshToken) throw new Error('No refresh token');
-    const res = await fetch(`${BASE_URL}/auth/token/refresh/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh: this.refreshToken }),
+  getUser(): User | null {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return null;
+    try {
+      return JSON.parse(userStr);
+    } catch {
+      return null;
+    }
+  }
+
+  private async request<T>(endpoint: string, options: any = {}): Promise<T> {
+    const { method = 'GET', body, params } = options;
+    const response = await this.axiosInstance({
+      url: endpoint,
+      method,
+      data: body,
+      params,
     });
-    if (!res.ok) throw new Error('Refresh failed');
-    const data = await res.json();
-    this.accessToken = data.access;
-    localStorage.setItem('access_token', data.access);
+    return response.data;
   }
 
   private normalizeUser(data: any): User {
@@ -220,31 +257,34 @@ class ApiClient {
     };
   }
 
-  // Auth methods (real API)
+  // Auth methods
   async webAuth(token: string): Promise<WebAuthResponse> {
-    const res = await this.request<any>(`/auth/web-auth/?token=${token}`, {
-      method: 'GET',
-    }, false);
-    
+    const res = await this.request<any>(`/auth/web-auth/?token=${token}`);
     const user = this.normalizeUser(res.user);
     this.setTokens(res.tokens.access, res.tokens.refresh);
     this.setUser(user);
-    
     return { ...res, user };
+  }
+
+  async getProfile(): Promise<User> {
+    const res = await this.request<any>('/auth/profile/');
+    const user = this.normalizeUser(res);
+    this.setUser(user);
+    return user;
   }
 
   async sendOTP(phone: string): Promise<SendOTPResponse> {
     return this.request<SendOTPResponse>('/auth/send-otp/', {
       method: 'POST',
-      body: JSON.stringify({ phone }),
-    }, false);
+      body: { phone },
+    });
   }
 
   async verifyOTP(phone: string, code: string): Promise<VerifyOTPResponse> {
     const res = await this.request<any>('/auth/verify-otp/', {
       method: 'POST',
-      body: JSON.stringify({ phone, code }),
-    }, false);
+      body: { phone, code },
+    });
     
     if (res.exists) {
       const user = this.normalizeUser(res.user);
@@ -258,55 +298,44 @@ class ApiClient {
   async register(data: RegisterData): Promise<AuthResponse> {
     const res = await this.request<any>('/auth/register/', {
       method: 'POST',
-      body: JSON.stringify({
-        full_name: data.full_name,
-        phone: data.phone,
-        code: data.code,
-        role: data.role || 'user',
-      }),
-    }, false);
+      body: data,
+    });
     const user = this.normalizeUser(res.user);
     this.setTokens(res.access, res.refresh);
     this.setUser(user);
-    return { user, access: res.access, refresh: res.refresh };
+    return { ...res, user };
   }
 
   async login(data: LoginData): Promise<AuthResponse> {
     const res = await this.request<any>('/auth/login/', {
       method: 'POST',
-      body: JSON.stringify({ phone: data.phone, code: data.code }),
-    }, false);
+      body: data,
+    });
     const user = this.normalizeUser(res.user);
     this.setTokens(res.access, res.refresh);
     this.setUser(user);
-    return { user, access: res.access, refresh: res.refresh };
+    return { ...res, user };
   }
 
   async logout(): Promise<void> {
     try {
+      const refresh = localStorage.getItem('refresh_token');
       await this.request('/auth/logout/', {
         method: 'POST',
-        body: JSON.stringify({ refresh: this.refreshToken }),
+        body: { refresh },
       });
     } catch {}
     this.clearTokens();
   }
 
-  async getProfile(): Promise<User> {
-    const user = await this.request<any>('/auth/profile/');
-    const normalized = this.normalizeUser(user);
-    this.setUser(normalized);
-    return normalized;
-  }
-
-  // Field/Pitch methods (real API - no auth required)
+  // Field/Pitch methods
   async getFields(): Promise<Pitch[]> {
-    const res = await this.request<any>('/fields/', {}, false);
+    const res = await this.request<any>('/fields/');
     return (res.results || []).map((f: any) => this.normalizeField(f));
   }
 
   async getFieldById(id: string): Promise<Pitch> {
-    const res = await this.request<any>(`/fields/${id}/`, {}, false);
+    const res = await this.request<any>(`/fields/${id}/`);
     return this.normalizeField(res);
   }
 
@@ -357,9 +386,11 @@ class ApiClient {
     };
   }
 
-  // Slot methods (real API - no auth required)
+  // Slot methods
   async getFieldSlots(fieldId: string, dateStr: string): Promise<FieldSlotsResponse> {
-    const res = await this.request<any>(`/fields/${fieldId}/slots/?date=${dateStr}`, {}, false);
+    const res = await this.request<any>(`/fields/${fieldId}/slots/`, {
+      params: { date: dateStr }
+    });
     const slots = (res.slots || []).map((slot: any) => this.normalizeSlot(slot));
     return { slots };
   }
@@ -377,7 +408,7 @@ class ApiClient {
     };
   }
 
-  // Booking methods (real API)
+  // Booking methods
   async getBookings(): Promise<Booking[]> {
     const res = await this.request<any>('/bookings/my/');
     return (res.results || []).map((b: any) => this.normalizeBooking(b));
@@ -393,32 +424,14 @@ class ApiClient {
   }): Promise<Booking> {
     const res = await this.request<any>('/bookings/', {
       method: 'POST',
-      body: JSON.stringify({
+      body: {
         field: bookingData.fieldId,
         booking_date: bookingData.bookingDate,
         start_time: bookingData.startTime,
         end_time: bookingData.endTime,
         total_price: bookingData.totalPrice,
         note: bookingData.note || '',
-      }),
-    });
-    return this.normalizeBooking(res);
-  }
-
-  async bookSlot(slotData: {
-    slotId: string;
-    fieldId: string;
-    date: string;
-    note?: string;
-  }): Promise<Booking> {
-    const res = await this.request<any>('/bookings/', {
-      method: 'POST',
-      body: JSON.stringify({
-        slot_id: parseInt(slotData.slotId),
-        field_id: parseInt(slotData.fieldId),
-        date: slotData.date,
-        note: slotData.note || '',
-      }),
+      },
     });
     return this.normalizeBooking(res);
   }
@@ -426,7 +439,7 @@ class ApiClient {
   async updateBookingStatus(bookingId: string, status: string): Promise<Booking> {
     const res = await this.request<any>(`/bookings/${bookingId}/`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: { status },
     });
     return this.normalizeBooking(res);
   }
@@ -434,7 +447,7 @@ class ApiClient {
   async cancelBooking(bookingId: string): Promise<void> {
     await this.request(`/bookings/${bookingId}/`, {
       method: 'PATCH',
-      body: JSON.stringify({ status: 'cancelled' }),
+      body: { status: 'cancelled' },
     });
   }
 
@@ -460,15 +473,12 @@ class ApiClient {
     };
   }
 
-  // Admin methods (real API)
+  // Admin methods
   async getAdminBookings(status?: string): Promise<Booking[]> {
-    const endpoint = status ? `/admin/bookings/?status=${status}` : '/admin/bookings/';
-    const res = await this.request<any>(endpoint);
+    const res = await this.request<any>('/admin/bookings/', {
+      params: { status }
+    });
     return (res.results || []).map((b: any) => this.normalizeBooking(b));
-  }
-
-  async getAllBookings(status?: string): Promise<Booking[]> {
-    return this.getAdminBookings(status);
   }
 
   async getAdminStats(): Promise<{ todayRevenue: number; totalRevenue: number; balance: number }> {
@@ -480,7 +490,7 @@ class ApiClient {
     };
   }
 
-  // Favorite methods (real API)
+  // Favorite methods
   async getFavorites(): Promise<{ id: string; fieldId: string }[]> {
     const res = await this.request<any>('/favorites/');
     return (res.results || []).map((f: any) => ({
@@ -492,7 +502,7 @@ class ApiClient {
   async addFavorite(fieldId: string): Promise<{ id: string; fieldId: string }> {
     const res = await this.request<any>('/favorites/', {
       method: 'POST',
-      body: JSON.stringify({ field: fieldId }),
+      body: { field: fieldId },
     });
     return {
       id: String(res.id),
@@ -501,7 +511,6 @@ class ApiClient {
   }
 
   async removeFavorite(fieldId: string): Promise<void> {
-    // Find favorite by fieldId first
     const favorites = await this.getFavorites();
     const favorite = favorites.find(f => f.fieldId === fieldId);
     if (favorite) {
@@ -511,9 +520,11 @@ class ApiClient {
     }
   }
 
-  // Review methods (real API)
+  // Review methods
   async getReviews(fieldId: string): Promise<Review[]> {
-    const res = await this.request<any>(`/reviews/?field=${fieldId}`);
+    const res = await this.request<any>(`/reviews/`, {
+      params: { field: fieldId }
+    });
     return (res.results || []).map((r: any) => this.normalizeReview(r));
   }
 
@@ -529,11 +540,11 @@ class ApiClient {
   }): Promise<Review> {
     const res = await this.request<any>('/reviews/', {
       method: 'POST',
-      body: JSON.stringify({
+      body: {
         field: reviewData.fieldId,
         rating: reviewData.rating,
         comment: reviewData.comment,
-      }),
+      },
     });
     return this.normalizeReview(res);
   }
@@ -550,16 +561,6 @@ class ApiClient {
         fullName: `${apiReview.user_details.first_name || ''} ${apiReview.user_details.last_name || ''}`.trim(),
       } : undefined,
     };
-  }
-
-  // Utility methods
-  getUser(): User | null {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
-  }
-
-  setUser(user: User): void {
-    localStorage.setItem('user', JSON.stringify(user));
   }
 }
 

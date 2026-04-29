@@ -4,6 +4,9 @@ import { api, User } from './api';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  isAuthenticated: boolean;
+  isPlayer: boolean;
+  isOwner: boolean;
   signIn: (phone: string, code: string) => Promise<{ error: any }>;
   signUp: (data: {
     full_name: string;
@@ -23,20 +26,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in (read from localStorage)
-    const token = api.getToken();
-    if (token) {
-      const stored = api.getUser();
-      setUser(stored);
-    }
-    setLoading(false);
+    const initAuth = async () => {
+      const token = api.getToken();
+      if (token) {
+        try {
+          const profile = await api.getProfile();
+          setUser(profile);
+        } catch (error) {
+          console.error('Profile fetch failed:', error);
+          api.clearTokens();
+          setUser(null);
+        }
+      }
+      setLoading(false);
+    };
+
+    initAuth();
   }, []);
 
   const signIn = async (phone: string, code: string) => {
     try {
       const response = await api.login({ phone, code });
-      api.setTokens(response.access, response.refresh);
-      api.setUser(response.user);
       setUser(response.user);
       return { error: null };
     } catch (error: any) {
@@ -51,8 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }) => {
     try {
       const response = await api.register({ ...data, role: 'user' });
-      api.setTokens(response.access, response.refresh);
-      api.setUser(response.user);
       setUser(response.user);
       return { error: null };
     } catch (error: any) {
@@ -96,8 +104,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const value = {
+    user,
+    loading,
+    isAuthenticated: !!user,
+    isPlayer: user?.user_role === 'PLAYER',
+    isOwner: user?.user_role === 'OWNER',
+    signIn,
+    signUp,
+    sendOTP,
+    verifyOTP,
+    webAuth,
+    signOut
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, sendOTP, verifyOTP, webAuth, signOut }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
