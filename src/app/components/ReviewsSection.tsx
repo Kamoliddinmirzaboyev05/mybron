@@ -66,20 +66,20 @@ export default function ReviewsSection({ pitchId }: ReviewsSectionProps) {
     <div className="mb-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-white mb-1">Sharhlar</h3>
+          <h3 className="text-sm font-black text-white uppercase tracking-wider mb-2">Sharhlar</h3>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-              <span className="text-white font-semibold">{averageRating}</span>
+            <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-0.5 rounded-md border border-yellow-500/20">
+              <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" />
+              <span className="text-yellow-500 text-xs font-bold">{averageRating}</span>
             </div>
-            <span className="text-slate-400 text-sm">({reviews.length} sharh)</span>
+            <span className="text-slate-500 text-xs font-medium uppercase">({reviews.length} sharh)</span>
           </div>
         </div>
         
         {user && !showAddReview && (
           <button
             onClick={() => setShowAddReview(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-blue-600/20"
           >
             Sharh qo'shish
           </button>
@@ -137,25 +137,27 @@ export default function ReviewsSection({ pitchId }: ReviewsSectionProps) {
       ) : (
         <div className="space-y-3">
           {reviews.map((review) => (
-            <div key={review.id} className="bg-[#0d1526] rounded-2xl p-4 border border-white/5">
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-slate-500" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-white font-semibold text-sm">{review.user?.fullName || 'Foydalanuvchi'}</span>
-                    <div className="flex items-center gap-1">
-                      <Star className="w-3.5 h-3.5 text-amber-400 fill-current" />
-                      <span className="text-white text-sm font-bold">{review.rating}</span>
+            <div key={review.id} className="bg-[#0d1526]/50 rounded-2xl p-4 border border-white/5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/10">
+                    <User className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <div className="text-white text-sm font-black tracking-tight">{review.user?.fullName || 'Foydalanuvchi'}</div>
+                    <div className="text-slate-600 text-[10px] uppercase font-bold tracking-wider">
+                      {new Date(review.createdAt || '').toLocaleDateString('uz-UZ')}
                     </div>
                   </div>
-                  {review.comment && <p className="text-slate-400 text-sm mb-1.5">{review.comment}</p>}
-                  <span className="text-slate-600 text-xs">
-                    {new Date(review.createdAt || '').toLocaleDateString('uz-UZ', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </span>
+                </div>
+                <div className="flex items-center gap-1 bg-yellow-500/5 px-2 py-1 rounded-lg">
+                  <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                  <span className="text-yellow-500 text-xs font-black">{review.rating}</span>
                 </div>
               </div>
+              <p className="text-slate-400 text-sm leading-relaxed font-medium">
+                {review.comment}
+              </p>
             </div>
           ))}
         </div>

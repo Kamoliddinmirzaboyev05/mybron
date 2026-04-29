@@ -1,7 +1,7 @@
 {
-  "name": "MYBRON - Maydon Band Qilish",
+  "name": "MYBRON - Futbol Maydonlarini Band Qilish Tizimi",
   "short_name": "MYBRON",
-  "description": "Sport maydonlarini oson va tez band qiling",
+  "description": "O'zbekistondagi futbol maydonlarini onlayn band qilishning eng oson va tezkor yo'li.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#020817",

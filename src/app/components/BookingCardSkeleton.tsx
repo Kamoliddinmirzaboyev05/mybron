@@ -1,34 +1,25 @@
 export default function BookingCardSkeleton() {
   return (
-    <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800">
-      <div className="p-4 animate-pulse">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="h-6 bg-slate-800/50 rounded w-2/3"></div>
-          <div className="h-6 bg-slate-800/50 rounded-full w-20"></div>
-        </div>
-
-        {/* Date and Time */}
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-slate-800/50 rounded mr-2"></div>
-            <div className="h-4 bg-slate-800/50 rounded w-40"></div>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-slate-800/50 rounded mr-2"></div>
-            <div className="h-4 bg-slate-800/50 rounded w-32"></div>
+    <div className="bg-[#0d1526]/50 rounded-[32px] overflow-hidden border border-white/5 shadow-sm">
+      <div className="p-5 animate-pulse">
+        {/* Top Info */}
+        <div className="flex gap-4 mb-5">
+          <div className="w-20 h-20 rounded-2xl bg-white/5 flex-shrink-0" />
+          <div className="flex-1 flex flex-col justify-center gap-2">
+            <div className="h-5 bg-white/5 rounded-lg w-3/4" />
+            <div className="h-4 bg-white/5 rounded-lg w-1/4" />
+            <div className="h-3 bg-white/5 rounded-lg w-1/2 mt-1" />
           </div>
         </div>
 
-        {/* Customer Info */}
-        <div className="bg-[#020817] rounded-lg p-3 mb-3">
-          <div className="h-3 bg-slate-800/50 rounded w-24 mb-2"></div>
-          <div className="space-y-1">
-            <div className="h-4 bg-slate-800/50 rounded w-full"></div>
-            <div className="h-4 bg-slate-800/50 rounded w-3/4"></div>
-            <div className="h-4 bg-slate-800/50 rounded w-1/2"></div>
-          </div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="h-14 bg-white/5 rounded-2xl" />
+          <div className="h-14 bg-white/5 rounded-2xl" />
         </div>
+
+        {/* Payment Info */}
+        <div className="h-20 bg-white/5 rounded-2xl border border-white/5" />
       </div>
     </div>
   );

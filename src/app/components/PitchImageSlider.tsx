@@ -35,12 +35,19 @@ export default function PitchImageSlider({ images, alt }: PitchImageSliderProps)
       >
         {images.map((image, index) => (
           <SwiperSlide key={index}>
-            <img
-              src={image}
-              alt={`${alt} - Image ${index + 1}`}
-              className="w-full h-full object-cover"
-              loading={index === 0 ? 'eager' : 'lazy'}
-            />
+            <div className="relative w-full h-full">
+              <img
+                src={image}
+                alt={`${alt} - Image ${index + 1}`}
+                className="w-full h-full object-cover"
+                loading={index === 0 ? 'eager' : 'lazy'}
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1000&auto=format&fit=crop'; // Default football pitch image
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+            </div>
           </SwiperSlide>
         ))}
       </Swiper>

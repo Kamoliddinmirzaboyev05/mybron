@@ -48,6 +48,16 @@ export default function Home() {
   useEffect(() => {
     fetchFields();
     getUserLocation().then(loc => { if (loc) setUserLocation(loc); });
+    
+    // SEO Initial
+    document.title = 'MYBRON - Futbol Maydonlarini Band Qilish Tizimi';
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', "O'zbekistondagi futbol maydonlarini onlayn band qilishning eng oson va tezkor yo'li. Maydonlar ro'yxati, narxlari va mavjud vaqtlari.");
+    }
+  }, []);
+
+  useEffect(() => {
     if (user) fetchFavorites();
   }, [user]);
 

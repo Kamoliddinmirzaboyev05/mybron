@@ -10,89 +10,96 @@ import Register from "./pages/Register";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import GuestRoute from "./components/GuestRoute";
+import RootLayout from "./components/RootLayout";
 
 export const router = createBrowserRouter([
   {
-    path: "/login",
-    Component: GuestRoute,
-    children: [
-      {
-        path: "",
-        Component: Login,
-      },
-    ],
-  },
-  {
-    path: "/register",
-    Component: GuestRoute,
-    children: [
-      {
-        path: "",
-        Component: Register,
-      },
-    ],
-  },
-  {
     path: "/",
-    Component: Home,
-  },
-  {
-    path: "/pitch/:id",
-    Component: ProtectedRoute,
+    Component: RootLayout,
     children: [
       {
-        path: "",
-        Component: PitchDetails,
+        path: "login",
+        Component: GuestRoute,
+        children: [
+          {
+            path: "",
+            Component: Login,
+          },
+        ],
       },
-    ],
-  },
-  {
-    path: "/bookings",
-    Component: ProtectedRoute,
-    children: [
       {
-        path: "",
-        Component: Bookings,
+        path: "register",
+        Component: GuestRoute,
+        children: [
+          {
+            path: "",
+            Component: Register,
+          },
+        ],
       },
-    ],
-  },
-  {
-    path: "/notifications",
-    Component: ProtectedRoute,
-    children: [
       {
         path: "",
-        Component: Notifications,
+        Component: Home,
       },
-    ],
-  },
-  {
-    path: "/profile",
-    Component: ProtectedRoute,
-    children: [
       {
-        path: "",
-        Component: Profile,
+        path: "pitch/:id",
+        Component: ProtectedRoute,
+        children: [
+          {
+            path: "",
+            Component: PitchDetails,
+          },
+        ],
       },
-    ],
-  },
-  {
-    path: "/my-reviews",
-    Component: ProtectedRoute,
-    children: [
       {
-        path: "",
-        Component: MyReviews,
+        path: "bookings",
+        Component: ProtectedRoute,
+        children: [
+          {
+            path: "",
+            Component: Bookings,
+          },
+        ],
       },
-    ],
-  },
-  {
-    path: "/admin",
-    Component: ProtectedRoute,
-    children: [
       {
-        path: "",
-        Component: AdminDashboard,
+        path: "notifications",
+        Component: ProtectedRoute,
+        children: [
+          {
+            path: "",
+            Component: Notifications,
+          },
+        ],
+      },
+      {
+        path: "profile",
+        Component: ProtectedRoute,
+        children: [
+          {
+            path: "",
+            Component: Profile,
+          },
+        ],
+      },
+      {
+        path: "my-reviews",
+        Component: ProtectedRoute,
+        children: [
+          {
+            path: "",
+            Component: MyReviews,
+          },
+        ],
+      },
+      {
+        path: "admin",
+        Component: ProtectedRoute,
+        children: [
+          {
+            path: "",
+            Component: AdminDashboard,
+          },
+        ],
       },
     ],
   },

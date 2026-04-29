@@ -22,21 +22,28 @@ export interface AuthResponse {
   user: User;
   access: string;
   refresh: string;
+  is_new_user?: boolean;
+}
+
+export interface SendOTPResponse {
+  message: string;
+  status: 'success' | 'error';
+}
+
+export interface VerifyOTPResponse extends AuthResponse {
+  exists: boolean;
 }
 
 export interface RegisterData {
-  first_name: string;
-  last_name: string;
-  login: string;
+  full_name: string;
   phone: string;
-  password: string;
-  password2: string;
+  code: string;
   role?: 'user';
 }
 
 export interface LoginData {
-  login: string;
-  password: string;
+  phone: string;
+  code: string;
 }
 
 export interface Pitch {
@@ -201,19 +208,38 @@ class ApiClient {
   }
 
   // Auth methods (real API)
+  async sendOTP(phone: string): Promise<SendOTPResponse> {
+    return this.request<SendOTPResponse>('/auth/send-otp/', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    }, false);
+  }
+
+  async verifyOTP(phone: string, code: string): Promise<VerifyOTPResponse> {
+    const res = await this.request<any>('/auth/verify-otp/', {
+      method: 'POST',
+      body: JSON.stringify({ phone, code }),
+    }, false);
+    
+    if (res.exists) {
+      const user = this.normalizeUser(res.user);
+      this.setTokens(res.access, res.refresh);
+      this.setUser(user);
+      return { ...res, user };
+    }
+    return res;
+  }
+
   async register(data: RegisterData): Promise<AuthResponse> {
     const res = await this.request<any>('/auth/register/', {
       method: 'POST',
       body: JSON.stringify({
-        username: data.login,
-        first_name: data.first_name,
-        last_name: data.last_name,
+        full_name: data.full_name,
         phone: data.phone,
-        password: data.password,
-        password2: data.password2,
+        code: data.code,
         role: data.role || 'user',
       }),
-    });
+    }, false);
     const user = this.normalizeUser(res.user);
     this.setTokens(res.access, res.refresh);
     this.setUser(user);
@@ -223,8 +249,8 @@ class ApiClient {
   async login(data: LoginData): Promise<AuthResponse> {
     const res = await this.request<any>('/auth/login/', {
       method: 'POST',
-      body: JSON.stringify({ username: data.login, password: data.password }),
-    });
+      body: JSON.stringify({ phone: data.phone, code: data.code }),
+    }, false);
     const user = this.normalizeUser(res.user);
     this.setTokens(res.access, res.refresh);
     this.setUser(user);
@@ -327,8 +353,8 @@ class ApiClient {
   }
 
   // Booking methods (real API)
-  async getBookings(userId: string): Promise<Booking[]> {
-    const res = await this.request<any>(`/bookings/?user=${userId}`);
+  async getBookings(): Promise<Booking[]> {
+    const res = await this.request<any>('/bookings/my/');
     return (res.results || []).map((b: any) => this.normalizeBooking(b));
   }
 
@@ -392,7 +418,7 @@ class ApiClient {
       id: String(apiBooking.id),
       userId: String(apiBooking.user || apiBooking.user_id || ''),
       fieldId: String(apiBooking.field || apiBooking.field_id || ''),
-      bookingDate: apiBooking.booking_date || apiBooking.date || '',
+      bookingDate: apiBooking.date || apiBooking.booking_date || '',
       startTime: (apiBooking.start_time || '').slice(0, 5),
       endTime: (apiBooking.end_time || '').slice(0, 5),
       totalPrice: parseFloat(apiBooking.total_price) || 0,
@@ -405,7 +431,7 @@ class ApiClient {
       confirmedAt: apiBooking.confirmed_at || null,
       rejectedAt: apiBooking.rejected_at || null,
       rejectReason: apiBooking.reject_reason || null,
-      field: apiBooking.field_details ? this.normalizeField(apiBooking.field_details) : undefined,
+      field: (apiBooking.field_detail || apiBooking.field_details) ? this.normalizeField(apiBooking.field_detail || apiBooking.field_details) : undefined,
     };
   }
 

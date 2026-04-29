@@ -4,15 +4,14 @@ import { api, User } from './api';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: (login: string, password: string) => Promise<{ error: any }>;
+  signIn: (phone: string, code: string) => Promise<{ error: any }>;
   signUp: (data: {
-    first_name: string;
-    last_name: string;
-    login: string;
+    full_name: string;
     phone: string;
-    password: string;
-    password2: string;
+    code: string;
   }) => Promise<{ error: any }>;
+  sendOTP: (phone: string) => Promise<{ error: any }>;
+  verifyOTP: (phone: string, code: string) => Promise<{ exists: boolean; error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -32,9 +31,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const signIn = async (login: string, password: string) => {
+  const signIn = async (phone: string, code: string) => {
     try {
-      const response = await api.login({ login, password });
+      const response = await api.login({ phone, code });
       api.setTokens(response.access, response.refresh);
       api.setUser(response.user);
       setUser(response.user);
@@ -45,12 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (data: {
-    first_name: string;
-    last_name: string;
-    login: string;
+    full_name: string;
     phone: string;
-    password: string;
-    password2: string;
+    code: string;
   }) => {
     try {
       const response = await api.register({ ...data, role: 'user' });
@@ -63,13 +59,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const sendOTP = async (phone: string) => {
+    try {
+      await api.sendOTP(phone);
+      return { error: null };
+    } catch (error: any) {
+      return { error };
+    }
+  };
+
+  const verifyOTP = async (phone: string, code: string) => {
+    try {
+      const response = await api.verifyOTP(phone, code);
+      if (response.exists && response.user) {
+        setUser(response.user);
+      }
+      return { exists: response.exists, error: null };
+    } catch (error: any) {
+      return { exists: false, error };
+    }
+  };
+
   const signOut = async () => {
     await api.logout();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, sendOTP, verifyOTP, signOut }}>
       {children}
     </AuthContext.Provider>
   );
